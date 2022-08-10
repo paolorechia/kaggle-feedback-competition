@@ -46,8 +46,8 @@ for j, text in enumerate(inputs_):
         nn.functional.softmax(pt_outputs.logits, dim=-1).detach().to("cpu").numpy()
     )
     #     print("Prediction: ", pt_predictions)
-    results["Ineffective"].append(pt_predictions[0][1])
-    results["Adequate"].append(pt_predictions[0][0])
+    results["Ineffective"].append(pt_predictions[0][0])
+    results["Adequate"].append(pt_predictions[0][1])
     results["Effective"].append(pt_predictions[0][2])
     
     print("Predictions: ", pt_predictions)
@@ -56,7 +56,7 @@ for j, text in enumerate(inputs_):
     for i in range(len(pt_predictions[0])):
         if pt_predictions[0][i] > max_:
             max_i = i
-            max_ = pt_predictions[0][1]
+            max_ = pt_predictions[0][i]
 
     actual_label = utils.label_number_to_label_name(max_i)
     target_label = labels[j]

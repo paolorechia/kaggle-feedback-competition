@@ -38,8 +38,8 @@ for text in inputs_:
         nn.functional.softmax(pt_outputs.logits, dim=-1).detach().to("cpu").numpy()
     )
     #     print("Prediction: ", pt_predictions)
-    results["Ineffective"].append(pt_predictions[0][1])
-    results["Adequate"].append(pt_predictions[0][0])
+    results["Ineffective"].append(pt_predictions[0][0])
+    results["Adequate"].append(pt_predictions[0][1])
     results["Effective"].append(pt_predictions[0][2])
 
     del pt_batch

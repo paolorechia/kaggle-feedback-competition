@@ -5,6 +5,7 @@ FP_PREPROCESSED_TEST_CSV = "./intermediary_state/test.csv"
 FP_ORIGINAL_TRAIN_CSV = "./data/train.csv"
 FP_ORIGINAL_TEST_CSV = "./data/test.csv"
 FP_OUTPUT_SAMPLE_SUBMISSION_CSV = "./data/submission_fullset.csv"
+FP_PREPROCESSED_BY_CATEGORY_CSV_DIR = "./intermediary_state/by_category"
 
 TRAINED_MODELS = {
     "bert-base-uncased-20test": "./trained_models/bert-uncased-20test",
@@ -40,8 +41,8 @@ for dir_ in [FP_TRAINED_MODEL_IN_USE, CHECKPOINT_DIR]:
 TEST_SIZE = 0.5
 NUM_LABELS = 3
 TOKENIZER_MAX_SIZE = 512
-
 USE_SMALL_DATASET = False
+SPLIT_BY_CATEGORY = True
 
 METRIC = "accuracy"
 
