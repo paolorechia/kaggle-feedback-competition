@@ -1,0 +1,10 @@
+**.pyc
+data/*
+test/*
+train/*
+by_category/*
+**/__pycache__/**
+trained_models/**
+checkpoint/*
+intermediary_state/*
+original_zip/*
