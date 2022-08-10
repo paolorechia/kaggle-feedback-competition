@@ -11,10 +11,10 @@ def discourse_effectiveness_to_int(discourse_effectiveness):
 
 # Not used, but still useful to know
 def label_number_to_label_name(x):
-    if x == 0:
-        return "ineffective"
     if x == 1:
-        return "adequate"
+        return "Ineffective"
+    if x == 0:
+        return "Adequate"
     if x == 2:
-        return "effective"
+        return "Effective"
     raise ValueError("Unknown label")
