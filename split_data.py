@@ -12,11 +12,20 @@ from utils import discourse_effectiveness_to_int, get_by_category_fp
 df = pd.read_csv(config.FP_ORIGINAL_TRAIN_CSV)
 
 print(df.columns)
-num_labels = len(df.discourse_effectiveness.unique())
+essays = {}
+ids_ = list(df.essay_id.unique())
+for id_ in ids_:
+    path = os.path.join(config.FP_ORIGINAL_TRAIN_ESSAY_DIR, f"{id_}.txt")
+    with open(path, "r") as fp:
+        text = fp.read()
+        essays[id_] = text
 
-df["label"] = df.discourse_effectiveness.apply(discourse_effectiveness_to_int)
+df["text"] = df.apply(lambda x: x.discourse_text + essays[x.essay_id], axis=1)
 df = df.drop("essay_id", axis=1)
-df = df.rename(columns={"discourse_text": "text"})
+
+num_labels = len(df.discourse_effectiveness.unique())
+df["label"] = df.discourse_effectiveness.apply(discourse_effectiveness_to_int)
+# df = df.rename(columns={"discourse_text": "text"})
 
 if config.SPLIT_BY_CATEGORY:
     print("Splitting by category")

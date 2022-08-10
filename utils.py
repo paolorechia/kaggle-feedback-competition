@@ -26,3 +26,5 @@ def label_number_to_label_name(x):
 def get_by_category_fp(base_path, train_or_test: str, category):
     filename = f"{train_or_test}_{category}.csv"
     return os.path.join(base_path, filename)
+
+categories = ["Claim", "Concluding Statement", "Counterclaim", "Evidence", "Lead", "Position", "Rebuttal"]
