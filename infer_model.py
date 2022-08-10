@@ -4,7 +4,7 @@ from transformers import AutoTokenizer, AutoModelForSequenceClassification
 import pandas as pd
 from config import config
 
-prediction_df = pd.read_csv(config.FP_ORIGINAL_TRAIN_CSV)
+prediction_df = pd.read_csv(config.FP_ORIGINAL_TEST_CSV)
 prediction_df = prediction_df.rename(columns={"discourse_text": "text"})
 
 inputs_ = list(prediction_df.text)
@@ -15,7 +15,7 @@ results = {
     "Adequate": [],
     "Effective": [],
 }
-print("Loading tokenizer and model...")
+print("Loading tokenizer and model...", config.FP_TRAINED_MODEL_IN_USE)
 
 num_labels = config.NUM_LABELS
 
