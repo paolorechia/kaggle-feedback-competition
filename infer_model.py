@@ -3,12 +3,20 @@ from torch import nn, cuda
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 import pandas as pd
 from config import config
+import os
 
 prediction_df = pd.read_csv(config.FP_ORIGINAL_TEST_CSV)
 prediction_df = prediction_df.rename(columns={"discourse_text": "text"})
 
 inputs_ = list(prediction_df.text)
+essays_ids = list(prediction_df.essay_id)
 
+# Read test essays
+essays = {}
+for essay_id in essays_ids:
+    with open(os.path.join(config.FP_ORIGINAL_TEST_ESSAY_DIR, f"{essay_id}.txt"), "r") as fp:
+        text = fp.read()
+        essays[essay_id] = text
 
 results = {
     "Ineffective": [],
@@ -25,9 +33,11 @@ model = AutoModelForSequenceClassification.from_pretrained(
 )
 
 print("Going to start predicting... ")
-for text in inputs_:
+for idx, text in enumerate(inputs_):
+    essay_id = essays_ids[idx]
+    essay = essays[essay_id]
     pt_batch = tokenizer(
-        text,
+        text + essay,
         padding=True,
         truncation=True,
         max_length=config.TOKENIZER_MAX_SIZE,

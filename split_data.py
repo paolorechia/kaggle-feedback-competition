@@ -20,7 +20,10 @@ for id_ in ids_:
         text = fp.read()
         essays[id_] = text
 
-df["text"] = df.apply(lambda x: x.discourse_text + essays[x.essay_id], axis=1)
+df["text"] = df.apply(
+    lambda x: x.discourse_type + " " + x.discourse_text + " " + essays[x.essay_id],
+    axis=1,
+)
 df = df.drop("essay_id", axis=1)
 
 num_labels = len(df.discourse_effectiveness.unique())
@@ -34,11 +37,17 @@ if config.SPLIT_BY_CATEGORY:
     for type_ in discourse_types:
         category_df = df[df.discourse_type == type_]
         print(type_, len(category_df))
-        train, test = train_test_split(category_df, test_size=config.TEST_SIZE, random_state=42)
-        train_fp = get_by_category_fp(config.FP_PREPROCESSED_BY_CATEGORY_CSV_DIR, "train", type_)
-        test_fp = get_by_category_fp(config.FP_PREPROCESSED_BY_CATEGORY_CSV_DIR, "test", type_)
+        train, test = train_test_split(
+            category_df, test_size=config.TEST_SIZE, random_state=42
+        )
+        train_fp = get_by_category_fp(
+            config.FP_PREPROCESSED_BY_CATEGORY_CSV_DIR, "train", type_
+        )
+        test_fp = get_by_category_fp(
+            config.FP_PREPROCESSED_BY_CATEGORY_CSV_DIR, "test", type_
+        )
         train.to_csv(train_fp, index=False)
-        test.to_csv(test_fp, index=False)        
+        test.to_csv(test_fp, index=False)
 
 else:
     print("Using full dataset")
@@ -65,7 +74,6 @@ else:
                     category_df.discourse_effectiveness == effectiveness
                 ]
                 print("-----> ", effectiveness, len(effectiveness_df))
-
 
     # Fullset
     train.to_csv(config.FP_PREPROCESSED_TRAIN_CSV, index=False)
