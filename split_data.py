@@ -40,22 +40,25 @@ if config.SPLIT_BY_CATEGORY:
         train, test = train_test_split(
             category_df, test_size=config.TEST_SIZE, random_state=42
         )
+        train, val = train_test_split(df ,test_size=config.VAL_SIZE, random_state=42)
+
         train_fp = get_by_category_fp(
             config.FP_PREPROCESSED_BY_CATEGORY_CSV_DIR, "train", type_
         )
         test_fp = get_by_category_fp(
             config.FP_PREPROCESSED_BY_CATEGORY_CSV_DIR, "test", type_
         )
+        val_fp = get_by_category_fp(
+            config.FP_PREPROCESSED_BY_CATEGORY_CSV_DIR, "val", type_
+        )
         train.to_csv(train_fp, index=False)
         test.to_csv(test_fp, index=False)
+        val.to_csv(val_fp, index=False)
 
 else:
     print("Using full dataset")
     train, test = train_test_split(df, test_size=config.TEST_SIZE, random_state=42)
-    if config.USE_SMALL_DATASET:
-        # Test with 10
-        train = train.head(n=10)
-        test = test.head(n=10)
+    train, val = train_test_split(df ,test_size=config.VAL_SIZE, random_state=42)
 
     discourse_types = df.discourse_type.unique()
     discourse_effectiveness_types = df.discourse_effectiveness.unique()
@@ -64,6 +67,7 @@ else:
         (df, "Full dataset"),
         (train, "Train dataset"),
         (test, "Test dataset"),
+        (val, "Validation dataset"),
     ]:
         print("===========", df_name, "============")
         for type_ in discourse_types:
@@ -78,3 +82,4 @@ else:
     # Fullset
     train.to_csv(config.FP_PREPROCESSED_TRAIN_CSV, index=False)
     test.to_csv(config.FP_PREPROCESSED_TEST_CSV, index=False)
+    val.to_csv(config.FP_PREPROCESSED_VAL_CSV, index=False)

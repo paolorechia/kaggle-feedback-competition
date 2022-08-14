@@ -1,15 +1,28 @@
 import os
+import torch
+
+# Enable TF32
+torch.backends.cuda.matmul.allow_tf32 = True
+
 
 FP_PREPROCESSED_TRAIN_CSV = "./intermediary_state/train.csv"
 FP_PREPROCESSED_TEST_CSV = "./intermediary_state/test.csv"
+FP_PREPROCESSED_VAL_CSV = "./intermediary_state/val.csv"
+
 FP_ORIGINAL_TRAIN_CSV = "./data/train.csv"
 FP_ORIGINAL_TEST_CSV = "./data/test.csv"
+
 FP_ORIGINAL_TRAIN_ESSAY_DIR = "./data/train/"
 FP_ORIGINAL_TEST_ESSAY_DIR = "./data/test/"
+
 FP_OUTPUT_SAMPLE_SUBMISSION_CSV = "./data/submission_fullset.csv"
+
 FP_PREPROCESSED_BY_CATEGORY_CSV_DIR = "./intermediary_state/by_category"
+
 FP_MERGED_FILE_OUTPUT = "./data/merged_file.txt"
+
 FP_GENERATED_DIR = "./generated_content"
+
 
 TRAINED_MODELS = {
     "bert-base-uncased-20test": "./trained_models/bert-uncased-20test",
@@ -32,8 +45,8 @@ EXPERIMENT_SUFFIX = ""
 # MODEL_NAME_IN_USE = "microsoft/mdeberta-v3-base"
 # EXPERIMENT_SUFFIX = ""
 
-# MODEL_NAME_IN_USE = "microsoft/deberta-v3-xsmall"
-# EXPERIMENT_SUFFIX = ""
+MODEL_NAME_IN_USE = "microsoft/deberta-v3-xsmall"
+EXPERIMENT_SUFFIX = ""
 
 # MODEL_NAME_IN_USE = "gpt2"
 # EXPERIMENT_SUFFIX = ""
@@ -50,9 +63,9 @@ for dir_ in [FP_TRAINED_MODEL_IN_USE, CHECKPOINT_DIR]:
         pass
 
 TEST_SIZE = 0.2
+VAL_SIZE = 0.223
 NUM_LABELS = 3
 TOKENIZER_MAX_SIZE = 512
-USE_SMALL_DATASET = False
 SPLIT_BY_CATEGORY = False
 
 METRIC = "accuracy"
@@ -64,18 +77,18 @@ training_parameters = {
         output_dir=CHECKPOINT_DIR,
         report_to=None,
         evaluation_strategy="steps",
-        num_train_epochs=1,
-        per_device_train_batch_size=6,
-        per_device_eval_batch_size=6,
+        num_train_epochs=2,
+        per_device_train_batch_size=4,
+        per_device_eval_batch_size=4,
         load_best_model_at_end=True,
-        save_steps=300,
-        eval_steps=300,
-        # todo:
-        # try:
-        # num_train_epochs=5,
-        # save_steps = 1500,
-        # eval_steps = 1500 
-    ),
+        save_steps=1000,
+        eval_steps=1000,
+        learning_rate=0.000001,
+        weight_decay=0.01,
+        gradient_accumulation_steps=2,
+        bf16=True,
+        bf16_full_eval=True
+    ),  # Loading best model from ./checkpoint_microsoft/deberta-v3-large/checkpoint-6000 (score: 0.6546485424041748).
     "microsoft/mdeberta-v3-base": TrainingArguments(
         output_dir=CHECKPOINT_DIR,
         report_to=None,
@@ -99,8 +112,9 @@ training_parameters = {
         eval_steps=500,
         learning_rate=0.000001,
         weight_decay=0.01,
-        gradient_accumulation_steps=1
-    ), 
+        gradient_accumulation_steps=1,
+        bf16=True
+    ), # without bf16: Loading best model from ./checkpoint_bert-base-uncased/checkpoint-6000 (score: 0.7045223116874695)
     "bert-base-uncased-50test": TrainingArguments(
         output_dir=CHECKPOINT_DIR,
         report_to=None,
@@ -116,13 +130,20 @@ training_parameters = {
         output_dir=CHECKPOINT_DIR,
         report_to=None,
         evaluation_strategy="steps",
-        num_train_epochs=3,
+        num_train_epochs=8,
         per_device_train_batch_size=32,
         per_device_eval_batch_size=32,
         load_best_model_at_end=True,
-        save_steps=300,
-        eval_steps=300,
-    ),  # {'eval_loss': 0.6639842987060547, 'eval_accuracy': 0.7019528912582277, 'eval_runtime': 103.2597, 'eval_samples_per_second': 178.027, 'eval_steps_per_second': 5.568, 'epoch': 1.57}
+        save_steps=1000,
+        eval_steps=1000,
+        learning_rate=0.00001,
+        weight_decay=0.01,
+        gradient_accumulation_steps=1,
+        bf16=True,
+        bf16_full_eval=True
+    ),  
+    # Loading best model from ./checkpoint_microsoft/deberta-v3-xsmall/checkpoint-7000 (score: 0.7678754925727844)
+    # {'eval_loss': 0.6639842987060547, 'eval_accuracy': 0.7019528912582277, 'eval_runtime': 103.2597, 'eval_samples_per_second': 178.027, 'eval_steps_per_second': 5.568, 'epoch': 1.57}
     "gpt2": TrainingArguments(
         output_dir=CHECKPOINT_DIR,  # The output directory
         num_train_epochs=5,  # number of training epochs

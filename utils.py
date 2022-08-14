@@ -23,8 +23,8 @@ def label_number_to_label_name(x):
     raise ValueError("Unknown label")
 
 
-def get_by_category_fp(base_path, train_or_test: str, category):
-    filename = f"{train_or_test}_{category}.csv"
+def get_by_category_fp(base_path, subset_partition: str, category):
+    filename = f"{subset_partition}_{category}.csv"
     return os.path.join(base_path, filename)
 
 categories = ["Claim", "Concluding Statement", "Counterclaim", "Evidence", "Lead", "Position", "Rebuttal"]
