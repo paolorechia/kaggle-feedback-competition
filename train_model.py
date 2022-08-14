@@ -6,8 +6,10 @@ from transformers import (
 )
 from datasets import load_dataset, load_metric
 from torch import nn
+import torch
 import os
 from config import config
+import sys
 
 
 def compute_metrics(eval_pred):
@@ -27,7 +29,21 @@ dataset = load_dataset(
     },
 )
 
-print(dataset)
+dataset["train"] = dataset["train"].remove_columns("label")
+dataset["train"] = dataset["train"].class_encode_column("discourse_effectiveness")
+dataset["train"] = dataset["train"].rename_column("discourse_effectiveness", "label")
+
+dataset["test"] = dataset["test"].class_encode_column("discourse_effectiveness")
+dataset["test"] = dataset["test"].remove_columns("label")
+dataset["test"] = dataset["test"].rename_column("discourse_effectiveness", "label")
+
+print(dataset["train"].features)
+print(dataset["test"].features)
+
+# raw_train_dataset = dataset["train"]
+# print(raw_train_dataset.features)
+# print(raw_train_dataset[0])
+
 
 print("Import tokenizer...")
 
@@ -45,7 +61,23 @@ def tokenize_function(examples):
 
 print("Tokenizing...")
 tokenized_datasets = dataset.map(tokenize_function, batched=True)
+# print(tokenized_datasets["train"])
+# print(tokenized_datasets["train"][0])
 
+# print(tokenizer.decode(tokenized_datasets["train"][0]["input_ids"]))
+# sample_test = """Lead Hi, i'm Isaac, i'm going to be writing about how this face on Mars is a natural landform or if there is life on Mars that made it. The story is about how NASA took a picture of Mars and a face was seen on the planet. NASA doesn't know if the landform was created by life on Mars, or if it is just a natural landform.  Hi, i'm Isaac, i'm going to be writing about how this face on Mars is a natural landform or if there is life on Mars that made it. The story is about how NASA took a picture of Mars and a face was seen on the planet. NASA doesn't know if the landform was created by life on Mars, or if it is just a natural landform. On my perspective, I think that the face is a natural landform because I dont think that there is any life on Mars. In these next few paragraphs, I'll be talking about how I think that is is a natural landform
+
+# I think that the face is a natural landform because there is no life on Mars that we have descovered yet. If life was on Mars, we would know by now. The reason why I think it is a natural landform because, nobody live on Mars in order to create the figure. It says in paragraph 9, ""It's not easy to target Cydonia,"" in which he is saying that its not easy to know if it is a natural landform at this point. In all that they're saying, its probably a natural landform.
+
+# People thought that the face was formed by alieans because they thought that there was life on Mars. though some say that life on Mars does exist, I think that there is no life on Mars.
+
+# It says in paragraph 7, on April 5, 1998, Mars Global Surveyor flew over Cydonia for the first time. Michael Malin took a picture of Mars with his Orbiter Camera, that the face was a natural landform. Everyone who thought it was made by alieans even though it wasn't, was not satisfied. I think they were not satisfied because they have thought since 1976 that it was really formed by alieans.
+
+# Though people were not satified about how the landform was a natural landform, in all, we new that alieans did not form the face. I would like to know how the landform was formed. we know now that life on Mars doesn't exist.             ",1"""
+
+# print(tokenizer.encode(sample_test))
+
+# sys.exit(0)
 model = AutoModelForSequenceClassification.from_pretrained(
     config.MODEL_NAME_IN_USE, num_labels=config.NUM_LABELS
 )
@@ -60,6 +92,40 @@ trainer = Trainer(
     eval_dataset=tokenized_datasets["test"],
     compute_metrics=compute_metrics,
 )
+
+# Let's overfit
+# Uncomment the block below to test if the model overfits with a single batch
+
+# print("Let's overfit to test the model...")
+# device = "cuda"
+# for batch in trainer.get_train_dataloader():
+#     break
+
+# print("Sending batch to GPU...")
+# batch = {k: v.to(device) for k, v in batch.items()}
+# trainer.create_optimizer()
+
+# print("Sending model to GPU...")
+# trainer.model.cuda()
+# trainer.model.train()
+# print("Overfitting...")
+# for _ in range(20):
+#     outputs = trainer.model(**batch)
+#     loss = outputs.loss
+#     loss.backward()
+#     trainer.optimizer.step()
+#     trainer.optimizer.zero_grad()
+
+# print("Evaluating overfitting test...")
+# trainer.model.eval()
+# with torch.no_grad():
+#     outputs = trainer.model(**batch)
+# preds = outputs.logits
+# labels = batch["labels"]
+
+# result = compute_metrics((preds.cpu().numpy(), labels.cpu().numpy()))
+
+# print(result)
 
 print("About to start training model... ", config.MODEL_NAME_IN_USE)
 model_output_dir = config.FP_TRAINED_MODEL_IN_USE

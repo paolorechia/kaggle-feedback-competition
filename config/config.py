@@ -28,25 +28,38 @@ TRAINED_MODELS = {
     "bert-base-uncased-20test": "./trained_models/bert-uncased-20test",
     "bert-base-uncased-50test": "./trained_models/bert-uncased-50test",
     "bert-base-uncased": "./trained_models/bert-uncased",
-
     "microsoft/deberta-v3-large": "./trained_models/microsoft-deberta-v3-large",
     "microsoft/mdeberta-v3-base": "./trained_models/microsoft-mdeberta-v3-base",
+    "microsoft/deberta-v3-base": "./trained_models/microsoft-deberta-v3-base",
     "microsoft/deberta-v3-xsmall": "./trained_models/microsoft-deberta-v3-xsmall",
-    "gpt2": "./trained_models/gpt2-text-generation",
+    "gpt2": "./trained_models/gpt2-text-generation"
 }
 
 BY_CATEGORY_TRAINED_MODEL_DIR = "by_category"
-MODEL_NAME_IN_USE = "bert-base-uncased"
-EXPERIMENT_SUFFIX = ""
+# MODEL_NAME_IN_USE = "bert-base-uncased"
+# EXPERIMENT_SUFFIX = ""
+# Overfit test ~30%
+
+# MODEL_NAME_IN_USE = "bert-large-uncased"
+# EXPERIMENT_SUFFIX = ""
+# Overfit test ~50%
 
 # MODEL_NAME_IN_USE = "microsoft/deberta-v3-large"
 # EXPERIMENT_SUFFIX = ""
+# Overfit Test ~43%
 
-# MODEL_NAME_IN_USE = "microsoft/mdeberta-v3-base"
-# EXPERIMENT_SUFFIX = ""
 
-MODEL_NAME_IN_USE = "microsoft/deberta-v3-xsmall"
+MODEL_NAME_IN_USE = "microsoft/mdeberta-v3-base"
 EXPERIMENT_SUFFIX = ""
+# Overfit test ~100%
+
+# MODEL_NAME_IN_USE = "microsoft/deberta-v3-base"
+# EXPERIMENT_SUFFIX = ""
+# Overfit test ~85%
+
+# MODEL_NAME_IN_USE = "microsoft/deberta-v3-xsmall"
+# EXPERIMENT_SUFFIX = ""
+# Overfit test ~20%
 
 # MODEL_NAME_IN_USE = "gpt2"
 # EXPERIMENT_SUFFIX = ""
@@ -81,14 +94,25 @@ training_parameters = {
         per_device_train_batch_size=4,
         per_device_eval_batch_size=4,
         load_best_model_at_end=True,
-        save_steps=1000,
-        eval_steps=1000,
+        save_steps=500,
+        eval_steps=500,
         learning_rate=0.000001,
         weight_decay=0.01,
         gradient_accumulation_steps=2,
         bf16=True,
         bf16_full_eval=True
     ),  # Loading best model from ./checkpoint_microsoft/deberta-v3-large/checkpoint-6000 (score: 0.6546485424041748).
+    "microsoft/deberta-v3-base": TrainingArguments(
+        output_dir=CHECKPOINT_DIR,
+        report_to=None,
+        evaluation_strategy="steps",
+        num_train_epochs=2,
+        per_device_train_batch_size=16,
+        per_device_eval_batch_size=16,
+        load_best_model_at_end=True,
+        save_steps=100,
+        eval_steps=100,
+    ),
     "microsoft/mdeberta-v3-base": TrainingArguments(
         output_dir=CHECKPOINT_DIR,
         report_to=None,
@@ -99,12 +123,17 @@ training_parameters = {
         load_best_model_at_end=True,
         save_steps=100,
         eval_steps=100,
-    ),  # {'eval_loss': 0.833855926990509, 'eval_accuracy': 0.6364575966925964, 'eval_runtime': 232.4464, 'eval_samples_per_second': 79.085, 'eval_steps_per_second': 4.943, 'epoch': 0.09}
+        learning_rate=2e-5,
+        weight_decay=0.01,
+        gradient_accumulation_steps=1,
+        bf16=True,
+        bf16_full_eval=True
+    ),
     "bert-base-uncased": TrainingArguments(
         output_dir=CHECKPOINT_DIR,
         report_to=None,
         evaluation_strategy="steps",
-        num_train_epochs=10,
+        num_train_epochs=6,
         per_device_train_batch_size=32,
         per_device_eval_batch_size=32,
         load_best_model_at_end=True,
@@ -113,8 +142,13 @@ training_parameters = {
         learning_rate=0.000001,
         weight_decay=0.01,
         gradient_accumulation_steps=1,
-        bf16=True
-    ), # without bf16: Loading best model from ./checkpoint_bert-base-uncased/checkpoint-6000 (score: 0.7045223116874695)
+        bf16=True,
+        bf16_full_eval=True
+    ),
+    # Train score: 0.7580183594315141
+    # Test score:  0.7860537767410278
+    # Validation score: 0.46144334188719316 (accuracy: 0.6660039761431411)
+    # Public score: 
     "bert-base-uncased-50test": TrainingArguments(
         output_dir=CHECKPOINT_DIR,
         report_to=None,
@@ -130,20 +164,23 @@ training_parameters = {
         output_dir=CHECKPOINT_DIR,
         report_to=None,
         evaluation_strategy="steps",
-        num_train_epochs=8,
+        num_train_epochs=6,
         per_device_train_batch_size=32,
         per_device_eval_batch_size=32,
         load_best_model_at_end=True,
         save_steps=1000,
         eval_steps=1000,
-        learning_rate=0.00001,
+        learning_rate=0.000001,
         weight_decay=0.01,
         gradient_accumulation_steps=1,
         bf16=True,
         bf16_full_eval=True
-    ),  
-    # Loading best model from ./checkpoint_microsoft/deberta-v3-xsmall/checkpoint-7000 (score: 0.7678754925727844)
-    # {'eval_loss': 0.6639842987060547, 'eval_accuracy': 0.7019528912582277, 'eval_runtime': 103.2597, 'eval_samples_per_second': 178.027, 'eval_steps_per_second': 5.568, 'epoch': 1.57}
+    ),
+    # Train: 0.70
+    # Test: 0.70
+    # Validation:
+    # Public:
+
     "gpt2": TrainingArguments(
         output_dir=CHECKPOINT_DIR,  # The output directory
         num_train_epochs=5,  # number of training epochs
