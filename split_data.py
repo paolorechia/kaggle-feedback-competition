@@ -1,7 +1,7 @@
-from random import random
-from unicodedata import category
 import numpy as np
 import pandas as pd  # data processing, CSV file I/O (e.g. pd.read_csv)
+import regex
+import math
 
 from sklearn.model_selection import train_test_split
 import os
@@ -9,7 +9,18 @@ import os
 from config import config
 from utils import discourse_effectiveness_to_int, get_by_category_fp
 
+import re
+
 df = pd.read_csv(config.FP_ORIGINAL_TRAIN_CSV)
+
+
+def preprocess(text):
+    t = text.lower()
+    t = re.sub("\n", "", t)
+    t = t.strip()
+    t = t.rstrip()
+    return t
+
 
 print(df.columns)
 essays = {}
@@ -18,7 +29,7 @@ for id_ in ids_:
     path = os.path.join(config.FP_ORIGINAL_TRAIN_ESSAY_DIR, f"{id_}.txt")
     with open(path, "r") as fp:
         text = fp.read()
-        essays[id_] = text
+        essays[id_] = preprocess(text)
 
 
 train_essay_ids, test_essays_ids = train_test_split(
@@ -28,16 +39,64 @@ train_essay_ids, val_essay_ids = train_test_split(
     train_essay_ids, test_size=config.VAL_SIZE, random_state=42
 )
 
-df["text"] = df.apply(
-    lambda x: x.discourse_type + " " + x.discourse_text + " " + essays[x.essay_id],
-    axis=1,
-)
+
+def f(x):
+    p = preprocess(x.discourse_text)
+    essay = essays[x.essay_id]
+    idx = essay.find(p)
+    if idx == -1:
+        print("Using fuzzy regex")
+        test = regex.search(f"({p})" + "{e<10}", essay)
+        if not test:
+            return -1
+        s = test.start()
+        return int(s)
+    else:
+        return int(idx)
+
+
+df["text_start"] = df.apply(f, axis=1)
+
+print(len(df.text_start))
+misses = len(df.text_start[df.text_start == -1])
+assert misses == 0
+token_size = 512
+# print(df.text_start)
+# print(df.text_start.describe())
+
+
+def get_context_window(x):
+    essay = essays[x.essay_id]
+    l = len(x.discourse_text)
+    type_len = len(x.discourse_type) + 1
+    extra_space = token_size - l - type_len
+    if extra_space <= 24:
+        return l
+    front_extra_space = extra_space // 2
+    back_extra_space = extra_space // 2
+    start_idx = max(0, x.text_start - front_extra_space)
+    end_idx = min(len(essay), x.text_start + back_extra_space)
+
+    context_window = ""
+    if start_idx < x.text_start:
+        context_window = " CSTR " + essay[start_idx : x.text_start] + " CEND "
+
+    context_window += f"{x.discourse_type.upper()} "
+    context_window += essay[x.text_start : x.text_start + l]
+
+    if end_idx > x.text_start + l:
+        context_window +=" CSTR " 
+        context_window += essay[x.text_start + l : end_idx]
+        context_window += " CEND "
+    return context_window
+
+
+df["text"] = df.apply(get_context_window, axis=1)
 df["label"] = df.discourse_effectiveness.apply(discourse_effectiveness_to_int)
 
 base_train_df = df[df.essay_id.isin(train_essay_ids)]
 base_test_df = df[df.essay_id.isin(test_essays_ids)]
 base_val_df = df[df.essay_id.isin(val_essay_ids)]
-
 
 
 base_train_df = base_train_df.drop("essay_id", axis=1)
