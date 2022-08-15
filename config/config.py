@@ -32,6 +32,7 @@ TRAINED_MODELS = {
     "microsoft/mdeberta-v3-base": "./trained_models/microsoft-mdeberta-v3-base",
     "microsoft/deberta-v3-base": "./trained_models/microsoft-deberta-v3-base",
     "microsoft/deberta-v3-xsmall": "./trained_models/microsoft-deberta-v3-xsmall",
+    "microsoft/deberta-v2-xlarge-mnli": "./trained_models/microsoft/deberta-v2-xlarge-mnli",
     "gpt2": "./trained_models/gpt2-text-generation"
 }
 
@@ -46,15 +47,18 @@ BY_CATEGORY_TRAINED_MODEL_DIR = "by_category"
 
 # MODEL_NAME_IN_USE = "microsoft/deberta-v3-large"
 # EXPERIMENT_SUFFIX = ""
-# Overfit Test ~43%
+# Overfit Test ~75%
 
-
-MODEL_NAME_IN_USE = "microsoft/mdeberta-v3-base"
-EXPERIMENT_SUFFIX = ""
-# Overfit test ~100%
-
-# MODEL_NAME_IN_USE = "microsoft/deberta-v3-base"
+# MODEL_NAME_IN_USE = "microsoft/deberta-v2-xlarge-mnli"
 # EXPERIMENT_SUFFIX = ""
+# Overfit test 100%
+
+# MODEL_NAME_IN_USE = "microsoft/mdeberta-v3-base"
+# EXPERIMENT_SUFFIX = ""
+# Overfit test 100%
+
+MODEL_NAME_IN_USE = "microsoft/deberta-v3-base"
+EXPERIMENT_SUFFIX = ""
 # Overfit test ~85%
 
 # MODEL_NAME_IN_USE = "microsoft/deberta-v3-xsmall"
@@ -106,26 +110,59 @@ training_parameters = {
         output_dir=CHECKPOINT_DIR,
         report_to=None,
         evaluation_strategy="steps",
-        num_train_epochs=2,
+        num_train_epochs=4,
         per_device_train_batch_size=16,
         per_device_eval_batch_size=16,
         load_best_model_at_end=True,
-        save_steps=100,
-        eval_steps=100,
+        save_steps=1000,
+        eval_steps=1000,
+        logging_steps=100,
+        learning_rate=0.00001,
+        weight_decay=0.1,
+        gradient_accumulation_steps=1,
+        bf16=True,
+        bf16_full_eval=True
     ),
+    # Test and train circa 0.70 loss
+    # Validation
+    # Accuracy: 0.7013304786664628
+    # Running loss: 0.4258868622504415
+
     "microsoft/mdeberta-v3-base": TrainingArguments(
         output_dir=CHECKPOINT_DIR,
         report_to=None,
         evaluation_strategy="steps",
-        num_train_epochs=2,
+        num_train_epochs=1,
         per_device_train_batch_size=16,
         per_device_eval_batch_size=16,
         load_best_model_at_end=True,
         save_steps=100,
         eval_steps=100,
-        learning_rate=2e-5,
-        weight_decay=0.01,
+        logging_steps=100,
+        learning_rate=0.00001,
+        weight_decay=0.7,
         gradient_accumulation_steps=1,
+        bf16=True,
+        bf16_full_eval=True
+    ),
+    # Train score: 0.5479189548227522
+    # Test score: 0.760585606098175
+    # Validation score: 
+    # Public score: fbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+    "microsoft/deberta-v2-xlarge-mnli": TrainingArguments(
+        output_dir=CHECKPOINT_DIR,
+        report_to=None,
+        evaluation_strategy="steps",
+        num_train_epochs=1,
+        per_device_train_batch_size=1,
+        per_device_eval_batch_size=1,
+        load_best_model_at_end=True,
+        save_steps=100,
+        eval_steps=100,
+        logging_steps=100,
+        learning_rate=0.00001,
+        # weight_decay=0.01,
+        gradient_accumulation_steps=8,
         bf16=True,
         bf16_full_eval=True
     ),

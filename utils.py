@@ -22,6 +22,15 @@ def label_number_to_label_name(x):
         return "Effective"
     raise ValueError("Unknown label")
 
+# Not used, but still useful to know
+def label_number_to_label_name_deberta_v3_base(x):
+    if x == 2:
+        return "Ineffective"
+    if x == 0:
+        return "Adequate"
+    if x == 1:
+        return "Effective"
+    raise ValueError("Unknown label")
 
 def get_by_category_fp(base_path, subset_partition: str, category):
     filename = f"{subset_partition}_{category}.csv"

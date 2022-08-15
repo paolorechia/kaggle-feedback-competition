@@ -10,6 +10,7 @@ import torch
 import os
 from config import config
 import sys
+import json
 
 
 def compute_metrics(eval_pred):
@@ -40,10 +41,14 @@ dataset["test"] = dataset["test"].rename_column("discourse_effectiveness", "labe
 print(dataset["train"].features)
 print(dataset["test"].features)
 
-# raw_train_dataset = dataset["train"]
-# print(raw_train_dataset.features)
-# print(raw_train_dataset[0])
+print("Labels")
+print(dataset["train"].features["label"].names)
+raw_train_dataset = dataset["train"]
+print(raw_train_dataset.features)
+print(raw_train_dataset[0])
 
+with open("labels.json", "w") as fp:
+    json.dump(dataset["train"].features["label"].names, fp)
 
 print("Import tokenizer...")
 
@@ -126,8 +131,11 @@ trainer = Trainer(
 # result = compute_metrics((preds.cpu().numpy(), labels.cpu().numpy()))
 
 # print(result)
+# sys.exit(0)
 
 print("About to start training model... ", config.MODEL_NAME_IN_USE)
+
+print("Arguments", config.training_args)
 model_output_dir = config.FP_TRAINED_MODEL_IN_USE
 print("Will save results to: ", model_output_dir)
 
@@ -138,6 +146,9 @@ print("Finished! Saving...")
 trainer.save_model(model_output_dir)
 tokenizer.save_pretrained(model_output_dir)
 
+print("Evaluating trained model...")
+result = trainer.evaluate()
+print(result)
 # Epoch 1, test 20%
 # {'eval_loss': 0.7537392377853394, 'eval_accuracy': 0.6627226982184142, 'eval_runtime': 61.4557, 'eval_samples_per_second': 119.647, 'eval_steps_per_second': 14.97, 'epoch': 0.54}
 # Epoch 1, test 50%
