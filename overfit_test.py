@@ -5,6 +5,7 @@ from transformers import (
     Trainer,
 )
 from datasets import load_dataset, load_metric
+import torch
 import os
 from config import config
 import json
@@ -23,26 +24,12 @@ dataset = load_dataset(
     "csv",
     data_files={
         "train": config.FP_PREPROCESSED_TRAIN_CSV,
-        "test": config.FP_PREPROCESSED_TEST_CSV,
     },
 )
 
 dataset["train"] = dataset["train"].remove_columns("label")
 dataset["train"] = dataset["train"].class_encode_column("discourse_effectiveness")
 dataset["train"] = dataset["train"].rename_column("discourse_effectiveness", "label")
-
-dataset["test"] = dataset["test"].class_encode_column("discourse_effectiveness")
-dataset["test"] = dataset["test"].remove_columns("label")
-dataset["test"] = dataset["test"].rename_column("discourse_effectiveness", "label")
-
-print(dataset["train"].features)
-print(dataset["test"].features)
-
-print("Labels")
-print(dataset["train"].features["label"].names)
-raw_train_dataset = dataset["train"]
-print(raw_train_dataset.features)
-print(raw_train_dataset[0])
 
 with open("labels.json", "w") as fp:
     json.dump(dataset["train"].features["label"].names, fp)
@@ -75,24 +62,39 @@ trainer = Trainer(
     model=model,
     args=config.training_args,
     train_dataset=tokenized_datasets["train"],
-    eval_dataset=tokenized_datasets["test"],
     compute_metrics=compute_metrics,
 )
 
+# Let's overfit
+# Uncomment the block below to test if the model overfits with a single batch
 
-print("About to start training model... ", config.MODEL_NAME_IN_USE)
+print("Let's overfit to test the model...")
+device = "cuda"
+for batch in trainer.get_train_dataloader():
+    break
 
-print("Arguments", config.training_args)
-model_output_dir = config.FP_TRAINED_MODEL_IN_USE
-print("Will save results to: ", model_output_dir)
+print("Sending batch to GPU...")
+batch = {k: v.to(device) for k, v in batch.items()}
+trainer.create_optimizer()
 
-print("Started!")
-trainer.train()
-print("Finished! Saving...")
+print("Sending model to GPU...")
+trainer.model.cuda()
+trainer.model.train()
+print("Overfitting...")
+for _ in range(20):
+    outputs = trainer.model(**batch)
+    loss = outputs.loss
+    loss.backward()
+    trainer.optimizer.step()
+    trainer.optimizer.zero_grad()
 
-trainer.save_model(model_output_dir)
-tokenizer.save_pretrained(model_output_dir)
+print("Evaluating overfitting test...")
+trainer.model.eval()
+with torch.no_grad():
+    outputs = trainer.model(**batch)
+preds = outputs.logits
+labels = batch["labels"]
 
-print("Evaluating trained model...")
-result = trainer.evaluate()
+result = compute_metrics((preds.cpu().numpy(), labels.cpu().numpy()))
+
 print(result)

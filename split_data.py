@@ -106,57 +106,53 @@ base_val_df = base_val_df.drop("essay_id", axis=1)
 
 num_labels = len(df.discourse_effectiveness.unique())
 # df = df.rename(columns={"discourse_text": "text"})
+print("Splitting by category")
+discourse_types = df.discourse_type.unique()
+print(discourse_types)
+for type_ in discourse_types:
+    train_category_df = base_train_df[base_train_df.discourse_type == type_]
+    test_category_df = base_test_df[base_test_df.discourse_type == type_]
+    val_category_df = base_val_df[base_val_df.discourse_type == type_]
 
-if config.SPLIT_BY_CATEGORY:
-    # TODO: split by essay here too
-    print("Splitting by category")
-    discourse_types = df.discourse_type.unique()
-    print(discourse_types)
+    print(
+        type_, len(train_category_df), len(test_category_df), len(val_category_df)
+    )
+
+    train_fp = get_by_category_fp(
+        config.FP_PREPROCESSED_BY_CATEGORY_CSV_DIR, "train", type_
+    )
+    test_fp = get_by_category_fp(
+        config.FP_PREPROCESSED_BY_CATEGORY_CSV_DIR, "test", type_
+    )
+    val_fp = get_by_category_fp(
+        config.FP_PREPROCESSED_BY_CATEGORY_CSV_DIR, "val", type_
+    )
+    train_category_df.to_csv(train_fp, index=False)
+    test_category_df.to_csv(test_fp, index=False)
+    val_category_df.to_csv(val_fp, index=False)
+
+print("Using full dataset")
+
+discourse_types = df.discourse_type.unique()
+discourse_effectiveness_types = df.discourse_effectiveness.unique()
+print(discourse_types)
+for main_df, df_name in [
+    (df, "Full dataset"),
+    (base_train_df, "Train dataset"),
+    (base_test_df, "Test dataset"),
+    (base_val_df, "Validation dataset"),
+]:
+    print("===========", df_name, "============")
     for type_ in discourse_types:
-        train_category_df = base_train_df[base_train_df.discourse_type == type_]
-        test_category_df = base_test_df[base_test_df.discourse_type == type_]
-        val_category_df = base_val_df[base_val_df.discourse_type == type_]
+        category_df = main_df[main_df.discourse_type == type_]
+        print(type_, len(category_df))
+        for effectiveness in discourse_effectiveness_types:
+            effectiveness_df = category_df[
+                category_df.discourse_effectiveness == effectiveness
+            ]
+            print("-----> ", effectiveness, len(effectiveness_df))
 
-        print(
-            type_, len(train_category_df), len(test_category_df), len(val_category_df)
-        )
-
-        train_fp = get_by_category_fp(
-            config.FP_PREPROCESSED_BY_CATEGORY_CSV_DIR, "train", type_
-        )
-        test_fp = get_by_category_fp(
-            config.FP_PREPROCESSED_BY_CATEGORY_CSV_DIR, "test", type_
-        )
-        val_fp = get_by_category_fp(
-            config.FP_PREPROCESSED_BY_CATEGORY_CSV_DIR, "val", type_
-        )
-        train_category_df.to_csv(train_fp, index=False)
-        test_category_df.to_csv(test_fp, index=False)
-        val_category_df.to_csv(val_fp, index=False)
-
-else:
-    print("Using full dataset")
-
-    discourse_types = df.discourse_type.unique()
-    discourse_effectiveness_types = df.discourse_effectiveness.unique()
-    print(discourse_types)
-    for main_df, df_name in [
-        (df, "Full dataset"),
-        (base_train_df, "Train dataset"),
-        (base_test_df, "Test dataset"),
-        (base_val_df, "Validation dataset"),
-    ]:
-        print("===========", df_name, "============")
-        for type_ in discourse_types:
-            category_df = main_df[main_df.discourse_type == type_]
-            print(type_, len(category_df))
-            for effectiveness in discourse_effectiveness_types:
-                effectiveness_df = category_df[
-                    category_df.discourse_effectiveness == effectiveness
-                ]
-                print("-----> ", effectiveness, len(effectiveness_df))
-
-    # Fullset
-    base_train_df.to_csv(config.FP_PREPROCESSED_TRAIN_CSV, index=False)
-    base_test_df.to_csv(config.FP_PREPROCESSED_TEST_CSV, index=False)
-    base_val_df.to_csv(config.FP_PREPROCESSED_VAL_CSV, index=False)
+# Fullset
+base_train_df.to_csv(config.FP_PREPROCESSED_TRAIN_CSV, index=False)
+base_test_df.to_csv(config.FP_PREPROCESSED_TEST_CSV, index=False)
+base_val_df.to_csv(config.FP_PREPROCESSED_VAL_CSV, index=False)
