@@ -26,7 +26,7 @@ for category in utils.categories:
     augmented_dfs[category] = generated_data
 
 
-for use_data_augmentation in [False, True]:
+for use_data_augmentation in [False]:
     category_dataframes = {}
     minimum_loss_classifier = {}
     minimum_loss = {}
@@ -51,6 +51,17 @@ for use_data_augmentation in [False, True]:
         'Counterclaim': 0.5387615637174712,
         'Rebuttal': 0.6539992282551927,
         'Concluding Statement': 0.8097786428921896
+    }
+
+    With new feature separation
+    {
+        'Lead': 0.6941110891699832,
+        'Position': 0.745130811783443,
+        'Claim': 0.8793841434314899,
+        'Evidence': 1.0056515737710097,
+        'Counterclaim': 0.6768397537746516,
+        'Rebuttal': 0.3094147154951862,
+        'Concluding Statement': 0.8245590478553934
     }
     """
 

@@ -9,6 +9,12 @@ import os
 from config import config
 import json
 
+import torch
+import random
+
+torch.manual_seed(0)
+random.seed(0)
+np.random.seed(0)
 
 def compute_metrics(eval_pred):
     logits, labels = eval_pred
