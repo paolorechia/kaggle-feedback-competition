@@ -6,12 +6,15 @@ from config import config
 import utils
 from sklearn.metrics import log_loss
 from datetime import datetime
+import os
 
 prediction_df = pd.read_csv(config.FP_ORIGINAL_TRAIN_CSV)
 prediction_df = prediction_df.rename(columns={"discourse_text": "text"})
 
-infer_subset_size = 100
 infer_subset_size = len(prediction_df)
+
+# infer_subset_size = 300
+# prediction_df = prediction_df[0:infer_subset_size]
 
 inputs_ = list(prediction_df.text)
 types = list(prediction_df.discourse_type)
@@ -29,15 +32,16 @@ num_labels = config.NUM_LABELS
 categories_tokenizers = {}
 categories_models = {}
 
+targets = []
+predictions = []
+
 for category in utils.categories:
-    if category != "Rebuttal":
-        continue
     print("Loading category: ", category)
-    categories_tokenizers[category] = AutoTokenizer.from_pretrained(
-        config.FP_TRAINED_MODEL_IN_USE
-    )
+    path = os.path.join(config.FP_TRAINED_MODEL_IN_USE, "by_category/", category)
+    print("Path", path)
+    categories_tokenizers[category] = AutoTokenizer.from_pretrained(path)
     categories_models[category] = AutoModelForSequenceClassification.from_pretrained(
-        config.FP_TRAINED_MODEL_IN_USE, num_labels=config.NUM_LABELS
+        path, num_labels=config.NUM_LABELS
     )
     print("Sending model to GPU")
     categories_models[category].cuda()
@@ -49,14 +53,11 @@ miss = 0
 total = 0
 accuracy = 0
 loss_sum = 0.0
-running_loss = 0.0
 multiple_chunks = 0
 
 t0 = datetime.now()
 for j, text in enumerate(inputs_):
     type_ = types[j]
-    if type_ != "Rebuttal":
-        continue
     tokenizer = categories_tokenizers[type_]
     model = categories_models[type_]
     pt_batch = tokenizer(
@@ -96,10 +97,9 @@ for j, text in enumerate(inputs_):
     # loss = criterion(pt_outputs, current_label)
     print(pt_predictions, target)
     loss = log_loss(target, pt_predictions[0])
+    targets.append(target)
+    predictions.append(pt_predictions[0])
     print("Current loss", loss)
-    loss_sum += loss
-    running_loss = loss_sum / (j + 1)
-    print("Running Loss: ", running_loss)
 
     #     print("Prediction: ", pt_predictions)
     # Label order for deberta-v3-base
@@ -134,7 +134,6 @@ t1 = datetime.now()
 
 print("Finished predicting!")
 print(f"Accuracy: {accuracy}")
-print(f"Running loss: {running_loss}")
 print(f"Number of multiple chunks found: {multiple_chunks}")
 
 delta = t1 - t0
@@ -143,6 +142,9 @@ time_per_inferece = diff_in_seconds / infer_subset_size
 print(f"Elapsed inference time: {diff_in_seconds} seconds")
 print(f"Required time per inference: {time_per_inferece} seconds")
 
+
+print(f"Final loss: {log_loss(targets, predictions)}")
+
 prediction_df["Ineffective"] = results["Ineffective"]
 prediction_df["Adequate"] = results["Adequate"]
 prediction_df["Effective"] = results["Effective"]
@@ -150,6 +152,8 @@ prediction_df["Effective"] = results["Effective"]
 prediction_df = prediction_df.drop("discourse_type", axis=1)
 prediction_df = prediction_df.drop("text", axis=1)
 print(prediction_df.head())
+
+
 
 prediction_df.to_csv(
     config.FP_OUTPUT_SAMPLE_SUBMISSION_CSV, index=False, float_format="%.1f"

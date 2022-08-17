@@ -54,6 +54,8 @@ tokenized_datasets = dataset.map(tokenize_function, batched=True)
 model = AutoModelForSequenceClassification.from_pretrained(
     config.MODEL_NAME_IN_USE, num_labels=config.NUM_LABELS
 )
+model.config = config.override_deberta_v2_config(model)
+print(model.config)
 
 os.environ["WANDB_DISABLED"] = "true"
 print(tokenized_datasets)

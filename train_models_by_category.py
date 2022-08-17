@@ -3,6 +3,7 @@ from transformers import (
     AutoTokenizer,
     AutoModelForSequenceClassification,
     Trainer,
+    DebertaV2Config,
 )
 from datasets import load_dataset, load_metric
 from torch import nn
@@ -25,7 +26,7 @@ categories = utils.categories
 experiment_id = uuid.uuid4()
 
 # Modify this to train other categories
-training_categories = ["Rebuttal"]
+training_categories = ["Counterclaim"]
 categories = training_categories
 
 datasets = {}
@@ -90,12 +91,10 @@ os.environ["WANDB_DISABLED"] = "true"
 print(tokenized_datasets)
 
 for category in categories:
+    deberta_config = DebertaV2Config.from_json_file(config.FP_DEBERTA_MODEL_CONFIG)
     model = AutoModelForSequenceClassification.from_pretrained(
-        config.MODEL_NAME_IN_USE, num_labels=config.NUM_LABELS
+        config.MODEL_NAME_IN_USE, config=deberta_config
     )
-    print("Overriding model config...")
-    model.config = config.override_deberta_v2_config(model)
-
     print("Model config", model.config)
     trainer = Trainer(
         model=model,
@@ -128,8 +127,11 @@ for category in categories:
     print("Evaluating trained model...")
     result = trainer.evaluate()
     print(result)
-    to_save = {"result": result, "args": config.experimental_args[category]}
-
+    to_save = {
+        "result": result,
+        "args": config.experimental_args[category],
+        "model_config": config.TRAINING_CONFIG_TO_SAVE,
+    }
     print("Saving results...")
     filename = f"{category}_{experiment_id}.json"
     path_ = os.path.join(config.FP_EXPERIMENT_PARAMETERS_DIR, filename)

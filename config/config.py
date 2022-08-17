@@ -1,5 +1,7 @@
+from cmath import exp
 import os
 import torch
+import json
 
 # Enable TF32
 torch.backends.cuda.matmul.allow_tf32 = True
@@ -24,17 +26,15 @@ FP_MERGED_FILE_OUTPUT = "./data/merged_file.txt"
 FP_GENERATED_DIR = "./generated_content"
 
 FP_EXPERIMENT_PARAMETERS_DIR = "./experiment_parameters"
+FP_DEBERTA_MODEL_CONFIG = "./deberta_current_config.json"
 
 
 TRAINED_MODELS = {
-    "bert-base-uncased-20test": "./trained_models/bert-uncased-20test",
-    "bert-base-uncased-50test": "./trained_models/bert-uncased-50test",
     "bert-base-uncased": "./trained_models/bert-uncased",
-    "bert-large-uncased": "./trained_models/bert-large-uncased",
     "microsoft/deberta-v3-large": "./trained_models/microsoft-deberta-v3-large",
-    "microsoft/mdeberta-v3-base": "./trained_models/microsoft-mdeberta-v3-base",
     "microsoft/deberta-v3-base": "./trained_models/microsoft-deberta-v3-base",
     "microsoft/deberta-v3-xsmall": "./trained_models/microsoft-deberta-v3-xsmall",
+    "microsoft/deberta-v3-small": "./trained_models/microsoft-deberta-v3-small",
     "microsoft/deberta-v2-xlarge-mnli": "./trained_models/microsoft/deberta-v2-xlarge-mnli",
     "gpt2": "./trained_models/gpt2-text-generation",
 }
@@ -42,70 +42,20 @@ TRAINED_MODELS = {
 BY_CATEGORY_TRAINED_MODEL_DIR = "by_category"
 # MODEL_NAME_IN_USE = "bert-base-uncased"
 # EXPERIMENT_SUFFIX = ""
-# Overfit test fullset: 50%
-"""
-{'accuracy': 0.625}
-Claim {'accuracy': 0.59375}
-Concluding Statement {'accuracy': 0.59375}
-Counterclaim {'accuracy': 0.84375}
-Evidence {'accuracy': 0.625}
-Lead {'accuracy': 0.59375}
-Position {'accuracy': 0.8125}
-Rebuttal {'accuracy': 0.625}
-"""
 
 
-MODEL_NAME_IN_USE = "microsoft/deberta-v3-large"
-EXPERIMENT_SUFFIX = ""
-# Overfit test fullset: 100%
-"""
-{'accuracy': 1.0}
-Claim {'accuracy': 1.0}
-Concluding Statement {'accuracy': 1.0}
-Counterclaim {'accuracy': 1.0}
-Evidence {'accuracy': 1.0}
-Lead {'accuracy': 1.0}
-Position {'accuracy': 1.0}
-Rebuttal {'accuracy': 1.0}
-"""
-
-# MODEL_NAME_IN_USE = "microsoft/deberta-v2-xlarge-mnli"
+# MODEL_NAME_IN_USE = "microsoft/deberta-v3-large"
 # EXPERIMENT_SUFFIX = ""
-# Overfit test fullset: 100%
-
-# MODEL_NAME_IN_USE = "microsoft/mdeberta-v3-base"
-# EXPERIMENT_SUFFIX = ""
-# Overfit test fullset: 68%
 
 # MODEL_NAME_IN_USE = "microsoft/deberta-v3-base"
 # EXPERIMENT_SUFFIX = ""
-# Overfit test fullset: 62%
-"""
-Claim {'accuracy': 0.625}
-Concluding Statement {'accuracy': 0.5625}
-Counterclaim {'accuracy': 0.9375}
-Evidence {'accuracy': 0.75}
-Lead {'accuracy': 0.8125}
-Position {'accuracy': 0.8125}
-Rebuttal {'accuracy': 0.625}
-"""
 
 # MODEL_NAME_IN_USE = "microsoft/deberta-v3-xsmall"
 # EXPERIMENT_SUFFIX = ""
-# Overfit test fullset: 50%
-"""
-# Overfit test by category
-Claim {'accuracy': 0.5}
-Concluding Statement {'accuracy': 0.5625}
-Counterclaim {'accuracy': 0.84375}
-Evidence {'accuracy': 0.625}
-Lead {'accuracy': 0.71875}
-Position {'accuracy': 0.8125}
-Rebuttal {'accuracy': 0.5625}
-"""
 
-# MODEL_NAME_IN_USE = "gpt2"
-# EXPERIMENT_SUFFIX = ""
+MODEL_NAME_IN_USE = "microsoft/deberta-v3-small"
+EXPERIMENT_SUFFIX = ""
+
 
 TRAINED_MODEL_KEY = MODEL_NAME_IN_USE + EXPERIMENT_SUFFIX
 
@@ -118,80 +68,240 @@ for dir_ in [FP_TRAINED_MODEL_IN_USE, CHECKPOINT_DIR, FP_EXPERIMENT_PARAMETERS_D
     except FileExistsError:
         pass
 
-TEST_SIZE = 0.2
-VAL_SIZE = 0.223
-NUM_LABELS = 3
-TOKENIZER_MAX_SIZE = 1024
 SPLIT_BY_CATEGORY = False
+REMOVE_STOP_WORDS = False
+USE_CONTEXT = False
+
+TEST_SIZE = 0.1
+VAL_SIZE = 0.1
+NUM_LABELS = 3
+TOKENIZER_MAX_SIZE = 128  # 512, 1024 or 2048
+HIDDEN_ACT = "gelu"
 HIDDEN_DROPOUT_PROB = 0.3
-ATTENTION_PROBS_DROPOUT_PROB = 0.3
-LAYER_NORM_EPS = 1e-7
+ATTENTION_PROBS_DROPOUT_PROB = 0.4
+POOLER_DROPOUT = 0.4
+LAYER_NORM_EPS = 1e-12
+
+TRAINING_CONFIG_TO_SAVE = {
+    "_name_or_path": "microsoft/deberta-v3-small",
+    "architectures": ["DebertaV2ForSequenceClassification"],
+    "attention_probs_dropout_prob": ATTENTION_PROBS_DROPOUT_PROB,
+    "hidden_act": HIDDEN_ACT,
+    "hidden_dropout_prob": HIDDEN_DROPOUT_PROB,
+    "hidden_size": 768,
+    "id2label": {"0": "ADEQUATE", "1": "EFFECTIVE", "2": "INEFFECTIVE"},
+    "initializer_range": 0.02,
+    "intermediate_size": 3072,
+    "label2id": {"ADEQUATE": 0, "EFFECTIVE": 1, "INEFFECTIVE": 2},
+    "layer_norm_eps": LAYER_NORM_EPS,
+    "max_position_embeddings": TOKENIZER_MAX_SIZE,
+    "max_relative_positions": -1,
+    "model_type": "deberta-v2",
+    "norm_rel_ebd": "layer_norm",
+    "num_attention_heads": 12,
+    "num_hidden_layers": 6,
+    "pad_token_id": 0,
+    "pooler_dropout": POOLER_DROPOUT,
+    "pooler_hidden_act": "gelu",
+    "pooler_hidden_size": 768,
+    "pos_att_type": ["p2c", "c2p"],
+    "position_biased_input": False,
+    "position_buckets": 256,
+    "relative_attention": True,
+    "share_att_key": True,
+    "torch_dtype": "float32",
+    "transformers_version": "4.21.1",
+    "type_vocab_size": 0,
+    "vocab_size": 128100,
+}
+with open(FP_DEBERTA_MODEL_CONFIG, "w") as fp:
+    json.dump(TRAINING_CONFIG_TO_SAVE, fp)
 
 METRIC = "accuracy"
 
-from transformers import DebertaV2Config, DebertaV2Model
-
-def override_deberta_v2_config(model: DebertaV2Model):
-    deberta_config: DebertaV2Config = model.config
-    deberta_config.max_position_embeddings = TOKENIZER_MAX_SIZE
-    deberta_config.hidden_dropout_prob = HIDDEN_DROPOUT_PROB
-    deberta_config.attention_probs_dropout_prob = ATTENTION_PROBS_DROPOUT_PROB
-    deberta_config.layer_norm_eps = LAYER_NORM_EPS
-    return deberta_config
-
 from transformers import TrainingArguments
 
-training_parameters = {}
+training_args_raw = {
+    "output_dir": CHECKPOINT_DIR,
+    "report_to": None,
+    "evaluation_strategy": "steps",
+    "num_train_epochs": 8,
+    "per_device_train_batch_size": 8,
+    "per_device_eval_batch_size": 8,
+    "learning_rate": 2e-5,
+    "weight_decay": 0.0001,
+    "data_seed": 0,
+    "seed": 0,
+    "logging_steps": 2000,
+    "eval_steps": 2000,
+    "save_steps": 2000,
+    "adam_beta1": 0.9,
+    "adam_beta2": 0.99,
+    "adam_epsilon": 1e-8,
+    "load_best_model_at_end": True,
+    "gradient_accumulation_steps": 1,
+    "bf16": True,
+    "bf16_full_eval": True,
+}
+training_args = TrainingArguments(**training_args_raw)
 
 experimental_args = {
     "Rebuttal": {
         "output_dir": CHECKPOINT_DIR,
         "report_to": None,
-        "evaluation_strategy": "epoch",
+        "evaluation_strategy": "steps",
         "num_train_epochs": 8,
-        "per_device_train_batch_size": 4,
-        "per_device_eval_batch_size": 4,
-        "learning_rate": 0.0001,
-        "weight_decay": 1,
+        "per_device_train_batch_size": 8,
+        "per_device_eval_batch_size": 8,
+        "learning_rate": 2e-5,
+        "weight_decay": 0.0001,
         "data_seed": 0,
         "seed": 0,
-        "logging_steps": 10,
+        "logging_steps": 40,
+        "eval_steps": 40,
+        "save_steps": 40,
         "adam_beta1": 0.9,
         "adam_beta2": 0.99,
-        "adam_epsilon": 1e-5,
-        "gradient_accumulation_steps": 10,
+        "adam_epsilon": 1e-8,
+        "load_best_model_at_end": True,
+        "gradient_accumulation_steps": 1,
         "bf16": True,
         "bf16_full_eval": True,
     },
     "Claim": {
         "output_dir": CHECKPOINT_DIR,
         "report_to": None,
-        "evaluation_strategy": "epoch",
-        "num_train_epochs": 2,
+        "evaluation_strategy": "steps",
+        "num_train_epochs": 4,
         "per_device_train_batch_size": 8,
         "per_device_eval_batch_size": 8,
-        "learning_rate": 0.0001,
-        "weight_decay": 1,
+        "learning_rate": 2e-5,
+        "weight_decay": 0.0001,
         "data_seed": 0,
         "seed": 0,
-        "logging_steps": 10,
+        "logging_steps": 200,
+        "eval_steps": 200,
+        "save_steps": 200,
         "adam_beta1": 0.9,
         "adam_beta2": 0.99,
-        "adam_epsilon": 1e-5,
-        "gradient_accumulation_steps": 10,
+        "adam_epsilon": 1e-8,
+        "load_best_model_at_end": True,
+        "gradient_accumulation_steps": 1,
+        "bf16": True,
+        "bf16_full_eval": True,
+    },
+    "Position": {
+        "output_dir": CHECKPOINT_DIR,
+        "report_to": None,
+        "evaluation_strategy": "steps",
+        "num_train_epochs": 4,
+        "per_device_train_batch_size": 8,
+        "per_device_eval_batch_size": 8,
+        "learning_rate": 2e-5,
+        "weight_decay": 0.0001,
+        "data_seed": 0,
+        "seed": 0,
+        "logging_steps": 200,
+        "eval_steps": 200,
+        "save_steps": 200,
+        "adam_beta1": 0.9,
+        "adam_beta2": 0.99,
+        "adam_epsilon": 1e-8,
+        "load_best_model_at_end": True,
+        "gradient_accumulation_steps": 1,
+        "bf16": True,
+        "bf16_full_eval": True,
+    },
+    "Evidence": {
+        "output_dir": CHECKPOINT_DIR,
+        "report_to": None,
+        "evaluation_strategy": "steps",
+        "num_train_epochs": 4,
+        "per_device_train_batch_size": 8,
+        "per_device_eval_batch_size": 8,
+        "learning_rate": 2e-5,
+        "weight_decay": 0.0001,
+        "data_seed": 0,
+        "seed": 0,
+        "logging_steps": 200,
+        "eval_steps": 200,
+        "save_steps": 200,
+        "adam_beta1": 0.9,
+        "adam_beta2": 0.99,
+        "adam_epsilon": 1e-8,
+        "load_best_model_at_end": True,
+        "gradient_accumulation_steps": 1,
+        "bf16": True,
+        "bf16_full_eval": True,
+    },
+    "Lead": {
+        "output_dir": CHECKPOINT_DIR,
+        "report_to": None,
+        "evaluation_strategy": "steps",
+        "num_train_epochs": 4,
+        "per_device_train_batch_size": 8,
+        "per_device_eval_batch_size": 8,
+        "learning_rate": 2e-5,
+        "weight_decay": 0.0001,
+        "data_seed": 0,
+        "seed": 0,
+        "logging_steps": 200,
+        "eval_steps": 200,
+        "save_steps": 200,
+        "adam_beta1": 0.9,
+        "adam_beta2": 0.99,
+        "adam_epsilon": 1e-8,
+        "load_best_model_at_end": True,
+        "gradient_accumulation_steps": 1,
+        "bf16": True,
+        "bf16_full_eval": True,
+    },
+    "Concluding Statement": {
+        "output_dir": CHECKPOINT_DIR,
+        "report_to": None,
+        "evaluation_strategy": "steps",
+        "num_train_epochs": 4,
+        "per_device_train_batch_size": 8,
+        "per_device_eval_batch_size": 8,
+        "learning_rate": 2e-5,
+        "weight_decay": 0.0001,
+        "data_seed": 0,
+        "seed": 0,
+        "logging_steps": 200,
+        "eval_steps": 200,
+        "save_steps": 200,
+        "adam_beta1": 0.9,
+        "adam_beta2": 0.99,
+        "adam_epsilon": 1e-8,
+        "load_best_model_at_end": True,
+        "gradient_accumulation_steps": 1,
+        "bf16": True,
+        "bf16_full_eval": True,
+    },
+    "Counterclaim": {
+        "output_dir": CHECKPOINT_DIR,
+        "report_to": None,
+        "evaluation_strategy": "steps",
+        "num_train_epochs": 8,
+        "per_device_train_batch_size": 8,
+        "per_device_eval_batch_size": 8,
+        "learning_rate": 2e-5,
+        "weight_decay": 0.0001,
+        "data_seed": 0,
+        "seed": 0,
+        "logging_steps": 200,
+        "eval_steps": 200,
+        "save_steps": 200,
+        "adam_beta1": 0.9,
+        "adam_beta2": 0.99,
+        "adam_epsilon": 1e-8,
+        "load_best_model_at_end": True,
+        "gradient_accumulation_steps": 1,
         "bf16": True,
         "bf16_full_eval": True,
     },
 }
 
-training_parameters_per_category = {
-    "Claim": TrainingArguments(**experimental_args["Claim"]),
-    "Concluding Statement": {},
-    "Counterclaim": {},
-    "Evidence": {},
-    "Lead": {},
-    "Position": {},
-    "Rebuttal": TrainingArguments(**experimental_args["Rebuttal"])
-}
-
-training_args = training_parameters[TRAINED_MODEL_KEY]
+training_parameters_per_category = {}
+for key, item in experimental_args.items():
+    training_parameters_per_category[key] = TrainingArguments(**item)

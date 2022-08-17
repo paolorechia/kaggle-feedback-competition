@@ -3,6 +3,7 @@ from transformers import (
     AutoTokenizer,
     AutoModelForSequenceClassification,
     Trainer,
+    DebertaV2Config,
 )
 from datasets import load_dataset, load_metric
 import os
@@ -12,9 +13,13 @@ import json
 import torch
 import random
 
+import uuid
+experiment_id = uuid.uuid4()
+
 torch.manual_seed(0)
 random.seed(0)
 np.random.seed(0)
+
 
 def compute_metrics(eval_pred):
     logits, labels = eval_pred
@@ -70,8 +75,9 @@ def tokenize_function(examples):
 print("Tokenizing...")
 tokenized_datasets = dataset.map(tokenize_function, batched=True)
 
+deberta_config = DebertaV2Config.from_json_file(config.FP_DEBERTA_MODEL_CONFIG)
 model = AutoModelForSequenceClassification.from_pretrained(
-    config.MODEL_NAME_IN_USE, num_labels=config.NUM_LABELS
+    config.MODEL_NAME_IN_USE, config=deberta_config
 )
 
 os.environ["WANDB_DISABLED"] = "true"
@@ -102,3 +108,16 @@ tokenizer.save_pretrained(model_output_dir)
 print("Evaluating trained model...")
 result = trainer.evaluate()
 print(result)
+
+to_save = {
+    "result": result,
+    "args": config.training_args_raw,
+    "model_config": model.config,
+}
+
+print("Saving results...")
+filename = f"fullset_{experiment_id}.json"
+path_ = os.path.join(config.FP_EXPERIMENT_PARAMETERS_DIR, filename)
+with open(path_, "w") as fp:
+    json.dump(to_save, fp)
+print("Saved!")

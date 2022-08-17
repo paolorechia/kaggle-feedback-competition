@@ -5,6 +5,9 @@ import math
 
 from sklearn.model_selection import train_test_split
 import os
+import nltk
+from nltk.corpus import stopwords
+from nltk.tokenize import word_tokenize
 
 from config import config
 from utils import discourse_effectiveness_to_int, get_by_category_fp
@@ -13,12 +16,36 @@ import re
 
 df = pd.read_csv(config.FP_ORIGINAL_TRAIN_CSV)
 
+stop_words = set(stopwords.words("english"))
+
+
+print("Using stop words?", config.REMOVE_STOP_WORDS)
+
 
 def preprocess(text):
     t = text.lower()
     t = re.sub("\n", "", t)
+
     t = t.strip()
     t = t.rstrip()
+
+    if config.REMOVE_STOP_WORDS:
+        # t = re.sub("`", "", t)
+        # t = re.sub("\.", "", t)
+        # t = re.sub("'", "", t)
+        # t = re.sub('"', "", t)
+        # t = re.sub(',', "", t)
+        # t = re.sub(':', "", t)
+        # t = re.sub(';', "", t)
+        # t = re.sub('\(', "", t)
+        # t = re.sub('\)', "", t)
+        t = t.strip()
+        t = t.rstrip()
+
+        word_tokens = word_tokenize(t)
+        filtered_sentence = [w for w in word_tokens if not w.lower() in stop_words and w is not None]
+        t = str(" ".join(filtered_sentence))
+    # print(t)
     return t
 
 
@@ -40,58 +67,59 @@ train_essay_ids, val_essay_ids = train_test_split(
 )
 
 
-def f(x):
-    p = preprocess(x.discourse_text)
-    essay = essays[x.essay_id]
-    idx = essay.find(p)
-    if idx == -1:
-        print("Using fuzzy regex")
-        test = regex.search(f"({p})" + "{e<10}", essay)
-        if not test:
-            return -1
-        s = test.start()
-        return int(s)
-    else:
-        return int(idx)
-
-
-df["text_start"] = df.apply(f, axis=1)
-
-print(len(df.text_start))
-misses = len(df.text_start[df.text_start == -1])
-assert misses == 0
-token_size = 512
 # print(df.text_start)
 # print(df.text_start.describe())
 
 
-def get_context_window(x):
-    essay = essays[x.essay_id]
-    l = len(x.discourse_text)
-    type_len = len(x.discourse_type) + 1
-    extra_space = token_size - l - type_len
-    if extra_space <= 24:
-        return l
-    front_extra_space = extra_space // 2
-    back_extra_space = extra_space // 2
-    start_idx = max(0, x.text_start - front_extra_space)
-    end_idx = min(len(essay), x.text_start + back_extra_space)
+if config.REMOVE_STOP_WORDS:
+    df["text"] = df.discourse_text.apply(preprocess)
+elif not config.REMOVE_STOP_WORDS and not config.USE_CONTEXT:
+    df["text"] = df.discourse_text
+elif config.USE_CONTEXT:
+    def f(x):
+        p = preprocess(x.discourse_text)
+        essay = essays[x.essay_id]
+        idx = essay.find(p)
+        if idx == -1:
+            print("Using fuzzy regex")
+            test = regex.search(f"({p})" + "{e<10}", essay)
+            if not test:
+                return -1
+            s = test.start()
+            return int(s)
+        else:
+            return int(idx)
+    def get_context_window(x):
+        essay = essays[x.essay_id]
+        l = len(x.discourse_text)
+        type_len = len(x.discourse_type) + 1
+        extra_space = config.TOKENIZER_MAX_SIZE - l - type_len
+        if extra_space <= 24:
+            return l
+        front_extra_space = extra_space // 2
+        back_extra_space = extra_space // 2
+        start_idx = max(0, x.text_start - front_extra_space)
+        end_idx = min(len(essay), x.text_start + back_extra_space)
 
-    context_window = ""
-    if start_idx < x.text_start:
-        context_window = " CSTR " + essay[start_idx : x.text_start] + " CEND "
+        context_window = ""
+        if start_idx < x.text_start:
+            context_window = " CSTR " + essay[start_idx : x.text_start] + " CEND "
 
-    context_window += f"{x.discourse_type.upper()} "
-    context_window += essay[x.text_start : x.text_start + l]
+        context_window += f"{x.discourse_type.upper()} "
+        context_window += essay[x.text_start : x.text_start + l]
 
-    if end_idx > x.text_start + l:
-        context_window +=" CSTR " 
-        context_window += essay[x.text_start + l : end_idx]
-        context_window += " CEND "
-    return context_window
+        if end_idx > x.text_start + l:
+            context_window += " CSTR "
+            context_window += essay[x.text_start + l : end_idx]
+            context_window += " CEND "
 
+        return context_window
+    df["text_start"] = df.apply(f, axis=1)
+    print(len(df.text_start))
+    misses = len(df.text_start[df.text_start == -1])
+    assert misses == 0
+    df["text"] = df.apply(get_context_window, axis=1)
 
-df["text"] = df.apply(get_context_window, axis=1)
 df["label"] = df.discourse_effectiveness.apply(discourse_effectiveness_to_int)
 
 base_train_df = df[df.essay_id.isin(train_essay_ids)]
@@ -114,9 +142,7 @@ for type_ in discourse_types:
     test_category_df = base_test_df[base_test_df.discourse_type == type_]
     val_category_df = base_val_df[base_val_df.discourse_type == type_]
 
-    print(
-        type_, len(train_category_df), len(test_category_df), len(val_category_df)
-    )
+    print(type_, len(train_category_df), len(test_category_df), len(val_category_df))
 
     train_fp = get_by_category_fp(
         config.FP_PREPROCESSED_BY_CATEGORY_CSV_DIR, "train", type_
