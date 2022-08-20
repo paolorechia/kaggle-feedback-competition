@@ -1,20 +1,21 @@
 # Train
+from calendar import c
 from random import random
 import pandas as pd
 from sklearn.feature_extraction.text import CountVectorizer, TfidfTransformer
 from sklearn.pipeline import Pipeline
-from sklearn.model_selection import KFold
 from sklearn.metrics import log_loss
-from sklearn.svm import SVC
 from sklearn.linear_model import SGDClassifier
-from sklearn.ensemble import RandomForestClassifier
 from sklearn.calibration import CalibratedClassifierCV
-from sklearn.decomposition import TruncatedSVD
 from config import config
 import utils
 import os
 
-original_df = pd.read_csv(config.FP_PREPROCESSED_TRAIN_CSV)
+df_train = pd.read_csv(config.FP_PREPROCESSED_TRAIN_CSV)
+df_test = pd.read_csv(config.FP_PREPROCESSED_TEST_CSV)
+df_val = pd.read_csv(config.FP_PREPROCESSED_VAL_CSV)
+
+
 augmented_dfs = {}
 augmented_dataset_size = 30
 
@@ -64,17 +65,19 @@ Best parameters loss_type=squared_hinge;penalty=l1;alpha=0.001;epsilon=0.1
 {'Lead': 100, 'Position': 100, 'Claim': 100, 'Evidence': 100, 'Counterclaim': 100, 'Rebuttal': 100, 'Concluding Statement': 0.7388559130132253}
 Best parameters loss_type=squared_epsilon_insensitive;penalty=l1;alpha=0.01;epsilon=0.1
 """
-for use_data_augmentation in [False]:
-    category_dataframes = {}
-    minimum_loss_classifier = {}
-    minimum_loss = {}
-    categories = list(original_df.discourse_type.unique())
-    for category in categories:
-        category_dataframes[category] = original_df[
-            original_df.discourse_type == category
-        ]
-        minimum_loss[category] = 100
-        minimum_loss_classifier[category] = None
+category_dataframes_train = {}
+category_dataframes_test = {}
+category_dataframes_val = {}
+
+minimum_loss_classifier = {}
+minimum_loss = {}
+categories = list(df_train.discourse_type.unique())
+for category in categories:
+    category_dataframes_train[category] = df_train[df_train.discourse_type == category]
+    category_dataframes_test[category] = df_test[df_test.discourse_type == category]
+    category_dataframes_val[category] = df_val[df_val.discourse_type == category]
+    minimum_loss[category] = 100
+    minimum_loss_classifier[category] = None
 
     """
     RandomForest without SVD
@@ -120,63 +123,73 @@ for loss_type in [
     for regularization in ["l1", "l2", "elasticnet"]:
         for alpha in [0.1, 0.01, 0.001, 0.0001]:
             for epsilon in [0.1, 0.01, 0.001]:
-                df = category_dataframes[category]
-                for category, df in category_dataframes.items():
-                    if category != "Concluding Statement":
+                cat_df_train = category_dataframes_train[category]
+                cat_df_test = category_dataframes_test[category]
+
+                for category, cat_df_train in category_dataframes_train.items():
+                    if category != "Position":
                         continue
-                    augmented_dataset_size = 30
-                    generated_data = augmented_dfs[category]
-                    # print(len(df))
-                    if use_data_augmentation:
-                        df = pd.concat([df, generated_data], ignore_index=True)
                     # print(len(df))
                     # print("Working with category: ", category)
-                    y = df.discourse_effectiveness
-                    X = df["text"]
-                    n_splits = 5
-                    kfold = KFold(n_splits=n_splits, random_state=None, shuffle=False)
+                    y_train = cat_df_train.discourse_effectiveness
+                    X_train = cat_df_train["text"]
+
+                    y_test = cat_df_test.discourse_effectiveness
+                    X_test = cat_df_test["text"]
+
                     min_loss = 100
                     # print("Starting training")
-                    for train_index, test_index in kfold.split(X):
-                        pipeline = Pipeline(
-                            [
-                                ("vect", CountVectorizer()),
-                                ("tdidf", TfidfTransformer()),
-                                (
-                                    "SGD",
-                                    SGDClassifier(
-                                        loss=loss_type,
-                                        penalty=regularization,
-                                        max_iter=1000,
-                                        random_state=42,
-                                        alpha=alpha,
-                                        epsilon=epsilon,
-                                        class_weight="balanced",
-                                    ),
+                    pipeline = Pipeline(
+                        [
+                            ("vect", CountVectorizer()),
+                            ("tdidf", TfidfTransformer()),
+                            (
+                                "SGD",
+                                SGDClassifier(
+                                    loss=loss_type,
+                                    penalty=regularization,
+                                    max_iter=1000,
+                                    random_state=42,
+                                    alpha=alpha,
+                                    epsilon=epsilon,
+                                    class_weight="balanced",
                                 ),
-                            ]
-                        )
-                        X_train = X.filter(items=train_index, axis=0)
-                        y_train = y.filter(items=train_index, axis=0)
-                        X_test = X.filter(items=test_index, axis=0)
-                        y_test = y.filter(items=test_index, axis=0)
-                        pipeline.fit(X_train, y_train)
-                        calibrated_clf = CalibratedClassifierCV(
-                            base_estimator=pipeline, cv="prefit"
-                        )
-                        calibrated_clf.fit(X_train, y_train)
-                        proba = calibrated_clf.predict_proba(X_test)
-                        loss = log_loss(y_test, proba, labels=pipeline.classes_)
-                        # print("Loss: ", loss, loss_type)
-                        if loss < minimum_loss[category]:
-                            # print("Found best loss so far: ", category, loss)
-                            minimum_loss[category] = loss
-                            minimum_loss_classifier[category] = pipeline
-                            best_parameters = f"loss_type={loss_type};penalty={regularization};alpha={alpha};epsilon={epsilon}"
+                            ),
+                        ]
+                    )
+                    pipeline.fit(X_train, y_train)
+                    calibrated_clf = CalibratedClassifierCV(
+                        base_estimator=pipeline, cv="prefit"
+                    )
+                    calibrated_clf.fit(X_train, y_train)
+                    proba = calibrated_clf.predict_proba(X_test)
+                    loss = log_loss(y_test, proba, labels=pipeline.classes_)
+                    # print("Loss: ", loss, loss_type)
+                    if loss < minimum_loss[category]:
+                        # print("Found best loss so far: ", category, loss)
+                        minimum_loss[category] = loss
+                        minimum_loss_classifier[category] = calibrated_clf
+                        best_parameters = f"loss_type={loss_type};penalty={regularization};alpha={alpha};epsilon={epsilon}"
 
         print("=====================================================================")
-        print(f"Training results - using data augmentation: {use_data_augmentation}")
+        print(f"Training result")
         print(minimum_loss)
         print("Best parameters", best_parameters)
 
-    # print(minimum_loss_classifier)
+print(minimum_loss_classifier)
+
+for category, cat_df_train in category_dataframes_train.items():
+    if category != "Position":
+        continue
+
+    cat_df_train = category_dataframes_train[category]
+    cat_df_val = category_dataframes_test[category]
+
+    y_train = cat_df_train.discourse_effectiveness
+    X_train = cat_df_train["text"]
+
+    y_val = cat_df_val.discourse_effectiveness
+    X_val = cat_df_val["text"]
+    proba_val = minimum_loss_classifier[category].predict_proba(X_val)
+    loss = log_loss(y_val, proba_val, labels=pipeline.classes_)
+    print("Validation loss: ", loss)
