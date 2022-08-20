@@ -19,33 +19,33 @@ df = pd.read_csv(config.FP_ORIGINAL_TRAIN_CSV)
 stop_words = set(stopwords.words("english"))
 
 
-print("Using stop words?", config.REMOVE_STOP_WORDS)
-
-
-def preprocess(text):
+def preprocess(text, stop_words_flag=False):
     t = text.lower()
     t = re.sub("\n", "", t)
 
     t = t.strip()
     t = t.rstrip()
 
-    if config.REMOVE_STOP_WORDS:
-        # t = re.sub("`", "", t)
-        # t = re.sub("\.", "", t)
-        # t = re.sub("'", "", t)
-        # t = re.sub('"', "", t)
-        # t = re.sub(',', "", t)
-        # t = re.sub(':', "", t)
-        # t = re.sub(';', "", t)
-        # t = re.sub('\(', "", t)
-        # t = re.sub('\)', "", t)
+    if stop_words_flag:
+        t = re.sub("`", "", t)
+        t = re.sub("\.", "", t)
+        t = re.sub("'", "", t)
+        t = re.sub('"', "", t)
+        t = re.sub(",", "", t)
+        t = re.sub(":", "", t)
+        t = re.sub(";", "", t)
+        t = re.sub("\(", "", t)
+        t = re.sub("\)", "", t)
         t = t.strip()
         t = t.rstrip()
 
         word_tokens = word_tokenize(t)
-        filtered_sentence = [w for w in word_tokens if not w.lower() in stop_words and w is not None]
+        lowered_tokens = [w.lower() for w in word_tokens]
+        filtered_sentence = []
+        for token in lowered_tokens:
+            if token not in stop_words:
+                filtered_sentence.append(token)
         t = str(" ".join(filtered_sentence))
-    # print(t)
     return t
 
 
@@ -70,12 +70,13 @@ train_essay_ids, val_essay_ids = train_test_split(
 # print(df.text_start)
 # print(df.text_start.describe())
 
-
+df["original_text"] = df.discourse_text
 if config.REMOVE_STOP_WORDS:
-    df["text"] = df.discourse_text.apply(preprocess)
-elif not config.REMOVE_STOP_WORDS and not config.USE_CONTEXT:
-    df["text"] = df.discourse_text
-elif config.USE_CONTEXT:
+    df["nltk_preprocessed"] = df.discourse_text.apply(
+        lambda x: preprocess(x, stop_words_flag=True)
+    )
+if config.USE_CONTEXT:
+
     def f(x):
         p = preprocess(x.discourse_text)
         essay = essays[x.essay_id]
@@ -89,6 +90,7 @@ elif config.USE_CONTEXT:
             return int(s)
         else:
             return int(idx)
+
     def get_context_window(x):
         essay = essays[x.essay_id]
         l = len(x.discourse_text)
@@ -114,13 +116,91 @@ elif config.USE_CONTEXT:
             context_window += " CEND "
 
         return context_window
+
     df["text_start"] = df.apply(f, axis=1)
     print(len(df.text_start))
     misses = len(df.text_start[df.text_start == -1])
     assert misses == 0
-    df["text"] = df.apply(get_context_window, axis=1)
+    df["text_with_context"] = df.apply(get_context_window, axis=1)
 
 df["label"] = df.discourse_effectiveness.apply(discourse_effectiveness_to_int)
+
+df.sort_values(by=["essay_id", "text_start"])
+
+
+current_essay = None
+current_sequence = ""
+sequences = []
+
+
+def discourse_type_to_letter(discourse_type):
+    d = {
+        "Claim": "A",
+        "Concluding Statement": "B",
+        "Counterclaim": "C",
+        "Evidence": "D",
+        "Lead": "E",
+        "Position": "F",
+        "Rebuttal": "G",
+    }
+    return d[discourse_type]
+
+
+def letter_multiplier(letter):
+    if letter == "A":
+        return 0.0001
+    if letter == "B":
+        return 0.001
+    if letter == "C":
+        return 0.01
+    if letter == "D":
+        return 0.1
+    if letter == "E":
+        return 1
+    if letter == "F":
+        return 10
+    if letter == "G":
+        return 100
+    return ValueError(letter)
+
+
+def parse_sequence_to_number(sequence):
+    sum_ = 0.0
+    blocks = sequence.split(";")
+    # Ignore empty block and ignore our own label (redundant info)
+    for block in blocks[0:-2]:
+        s = block.split(":")
+        letter = s[0]
+        label = s[1]
+        sum_ += letter_multiplier(letter) * int(label)
+    return sum_
+
+
+def extract_last_label(sequence):
+    blocks = sequence.split(";")
+    # Ignore empty block and ignore our own label (redundant info)
+    for block in blocks[0:-2]:
+        s = block.split(":")
+        label = s[1]
+        return label
+    return -1
+
+
+for idx, row in df.iterrows():
+    if row.essay_id != current_essay:
+        current_essay = row.essay_id
+        current_sequence = ""
+    sequence_letter = discourse_type_to_letter(row.discourse_type)
+    sequence_number = row.label
+    current_sequence += f"{sequence_letter}:{sequence_number};"
+    sequences.append(current_sequence)
+
+df["sequence_code"] = sequences
+df["sequence_sum"] = df.sequence_code.apply(parse_sequence_to_number)
+df["previous_label"] = df.sequence_code.apply(extract_last_label)
+print(df.head(n=20))
+print(df.tail(n=20))
+
 
 base_train_df = df[df.essay_id.isin(train_essay_ids)]
 base_test_df = df[df.essay_id.isin(test_essays_ids)]
