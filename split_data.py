@@ -1,3 +1,4 @@
+from random import shuffle
 import numpy as np
 import pandas as pd  # data processing, CSV file I/O (e.g. pd.read_csv)
 import regex
@@ -127,6 +128,9 @@ df["label"] = df.discourse_effectiveness.apply(discourse_effectiveness_to_int)
 
 df.sort_values(by=["essay_id", "text_start"])
 
+print(len(df))
+df = df.sample(frac=1.0, random_state=42)
+print(len(df))
 
 current_essay = None
 current_sequence = ""
