@@ -11,7 +11,7 @@ from sklearn.calibration import CalibratedClassifierCV
 from config import config
 import numpy as np
 
-category = "Position"
+category = "Evidence"
 df = pd.read_csv(config.FP_PREPROCESSED_TRAIN_CSV)
 df = df[df.discourse_type == category]
 
@@ -20,68 +20,69 @@ df_test = pd.read_csv(config.FP_PREPROCESSED_TEST_CSV)
 df_test = df_test[df_test.discourse_type == category]
 
 
+def make_tfidf_pipeline(clf):
+    return Pipeline(
+        [("vect", CountVectorizer()), ("tdidf", TfidfTransformer()), ("clf", clf)]
+    )
+
+
 pipelines = [
     (
         "SGD 1",
-        Pipeline(
-            [
-                ("vect", CountVectorizer()),
-                ("tdidf", TfidfTransformer()),
-                (
-                    "clf",
-                    SGDClassifier(
-                        loss="modified_huber",
-                        penalty="l1",
-                        alpha=0.01,
-                        epsilon=0.1,
-                        max_iter=1000,
-                        random_state=42,
-                    ),
-                    #                    Best parameters loss_type=modified_huber;penalty=l1;alpha=0.01;epsilon=0.1
-                ),
-            ]
+        make_tfidf_pipeline(
+            SGDClassifier(
+                loss="modified_huber",
+                penalty="l1",
+                alpha=0.01,
+                epsilon=0.1,
+                max_iter=1000,
+                random_state=42,
+            )
         ),
     ),
     (
         "SGD 2",
-        Pipeline(
-            [
-                ("vect", CountVectorizer()),
-                ("tdidf", TfidfTransformer()),
-                (
-                    "clf",
-                    SGDClassifier(
-                        loss="squared_epsilon_insensitive",
-                        penalty="l2",
-                        alpha=0.1,
-                        epsilon=0.1,
-                        max_iter=1000,
-                        random_state=42,
-                    ),
-                ),
-            ]
+        make_tfidf_pipeline(
+            SGDClassifier(
+                loss="squared_epsilon_insensitive",
+                penalty="l2",
+                alpha=0.1,
+                epsilon=0.1,
+                max_iter=1000,
+                random_state=42,
+            ),
         ),
     ),
     (
         "SGD 3",
-        Pipeline(
-            [
-                ("vect", CountVectorizer()),
-                ("tdidf", TfidfTransformer()),
-                (
-                    "clf",
-                    SGDClassifier(
-                        loss="squared_error",
-                        penalty="elasticnet",
-                        alpha=0.01,
-                        epsilon=0.1,
-                        max_iter=1000,
-                        random_state=42,
-                    ),
-                ),
-            ]
+        make_tfidf_pipeline(
+            SGDClassifier(
+                loss="squared_error",
+                penalty="elasticnet",
+                alpha=0.01,
+                epsilon=0.1,
+                max_iter=1000,
+                random_state=42,
+            ),
         ),
     ),
+    # (
+    #     "random_forest",
+    #     make_tfidf_pipeline(
+    #         RandomForestClassifier(
+    #             max_depth=10,
+    #             n_estimators=1,
+    #             max_features=1,
+    #             random_state=42,
+    #         )
+    #     ),
+    # ),
+    # (
+    #     "SVC",
+    #     make_tfidf_pipeline(
+    #         SVC(kernel="linear", C=1, probability=True, random_state=42),
+    #     ),
+    # ),
     # loss_type=squared_error;penalty=elasticnet;alpha=0.01;epsilon=0.1
 ]
 
@@ -124,9 +125,7 @@ print("Ensemble training")
 probs = {}
 to_stack = []
 for key, classifier in minimum_loss_classifier.items():
-    print("Pushing key", key)
     clf_probs = classifier.predict_proba(X_train)
-    print(clf_probs.shape)
     to_stack.append(clf_probs)
     probs[key] = clf_probs
 
@@ -142,23 +141,27 @@ ensemble.fit(X_train_new, y_train)
 probs = {}
 to_stack = []
 for key, classifier in minimum_loss_classifier.items():
-    probs[key] = classifier.predict_proba(X_train)
-    to_stack.append(probs[key])
+    clf_probs = classifier.predict_proba(X_test)
+    to_stack.append(clf_probs)
+    probs[key] = clf_probs
+
 
 stacked_test = np.column_stack(to_stack)
+print("Stacked shape", stacked_test.shape)
 
 proba_test = ensemble.predict_proba(stacked_test)
+
+print("Proba shape", proba_test.shape)
 loss = log_loss(y_test, proba_test, labels=pipeline.classes_)
 print("Ensemble Loss: ", loss)
-score = ensemble.score(stacked_test, y_test)
-print("Ensemble score: ", score)
 if loss < best_ensemble_loss:
     best_ensemble_loss = loss
     best_ensemble = ensemble
 
 print("Best ensemble", best_ensemble)
-print("Loss: ", best_ensemble_loss)
-
+print("Test Loss: ", best_ensemble_loss)
+score = ensemble.score(stacked_test, y_test)
+print("Test score (accuracy): ", score)
 
 df_val = pd.read_csv(config.FP_PREPROCESSED_VAL_CSV)
 df_val = df_val[df_val.discourse_type == category]
@@ -169,11 +172,14 @@ X_val = df_val["text"]
 probs = {}
 to_stack = []
 for key, classifier in minimum_loss_classifier.items():
-    probs[key] = classifier.predict_proba(X_train)
-    to_stack.append(probs[key])
+    clf_probs = classifier.predict_proba(X_val)
+    to_stack.append(clf_probs)
+    probs[key] = clf_probs
 
 stacked_val = np.column_stack(to_stack)
 X_val_new = stacked_val
 proba_val = best_ensemble.predict_proba(stacked_val)
 val_loss = log_loss(y_val, proba_val, labels=pipeline.classes_)
 print("Validation loss: ", val_loss)
+score = ensemble.score(stacked_val, y_val)
+print("Validation score (accuracy): ", score)
