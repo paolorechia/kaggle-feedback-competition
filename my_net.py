@@ -5,6 +5,12 @@ import utils
 import pandas as pd
 import numpy as np
 import json
+import random
+
+
+torch.manual_seed(0)
+random.seed(0)
+np.random.seed(0)
 
 
 def load_dataset(partition="train", category="Claim"):
