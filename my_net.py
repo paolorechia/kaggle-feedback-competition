@@ -94,11 +94,12 @@ feature_column = "flatten_text_matrix"
 
 
 X_train, y_train = load_dataset(partition="train")
-
 X_train_tensor, y_train_tensor = create_tensors(X_train, y_train)
 
 print("Training...")
 ## y in math
+total_loss = 0.0
+j = 0
 for epoch in range(10):
     for idx in range(len(X_train_tensor)):
         X = X_train_tensor[idx].to(device)
@@ -107,5 +108,51 @@ for epoch in range(10):
         result = model(X)
         loss = criterion(result, y)
         loss.backward()
+        total_loss += loss.item()
         optimizer.step()
-    print("epoch {}, loss {}".format(epoch, loss.item()))
+        j += 1
+    print("epoch {}, loss {}".format(epoch, total_loss / j))
+
+print("Cleaning training data...")
+del X_train
+del y_train
+del X_train_tensor
+del y_train_tensor
+
+
+def test_model_on(partition):
+    print("Testing on partition... ", partition)
+    X, y = load_dataset(partition)
+    X_tensor, y_tensor = create_tensors(X, y)
+
+    hits = 0.0
+    misses = 0.0
+    total_loss = 0.0
+    j = 0
+    for idx in range(len(X_tensor)):
+        X = X_tensor[idx].to(device)
+        y = y_tensor[idx].to(device)
+        with torch.no_grad():
+            result = model(X)
+            loss = criterion(result, y)
+            actual_class = torch.argmax(y)
+            predicted_class = torch.argmax(result)
+            if actual_class == predicted_class:
+                hits += 1
+            else:
+                misses += 1
+            total_loss += loss.item()
+    print("Loss {}".format(total_loss / len(X_tensor)))
+    accuracy = hits / (hits + misses)
+    print(f"Model accuracy in {partition} dataset: {accuracy}")
+
+    print("Cleaning test data...")
+    del X
+    del y
+    del X_tensor
+    del y_tensor
+
+
+test_model_on("train")
+test_model_on("test")
+test_model_on("val")

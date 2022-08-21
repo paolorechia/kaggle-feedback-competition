@@ -88,4 +88,4 @@ def parse_and_pad_flattened_arrays(X, cache_label=None):
             json.dump(X_new, fp)
             flattened_cache[cache_label] = np.array(X_new)
             return flattened_cache[cache_label]
-    return np.array(X_new)
+    return np.array(X_new, dtype=np.float32)
