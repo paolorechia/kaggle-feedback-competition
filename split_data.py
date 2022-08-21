@@ -1,12 +1,9 @@
-from random import shuffle
 import numpy as np
 import pandas as pd  # data processing, CSV file I/O (e.g. pd.read_csv)
 import regex
-import math
 
 from sklearn.model_selection import train_test_split
 import os
-import nltk
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 
@@ -14,10 +11,38 @@ from config import config
 from utils import discourse_effectiveness_to_int, get_by_category_fp
 
 import re
+import gensim.downloader as api
+from gensim.models.fasttext import KeyedVectors
+
+print("Loading fast text model...")
+fast_text_model: KeyedVectors = api.load("fasttext-wiki-news-subwords-300")
+print(fast_text_model, type(fast_text_model))
+print("Loaded!")
 
 df = pd.read_csv(config.FP_ORIGINAL_TRAIN_CSV)
 
 stop_words = set(stopwords.words("english"))
+
+
+def build_fast_text_matrix(row):
+    low_case = row.discourse_text.lower()
+    word_tokens = word_tokenize(low_case)
+    word_matrix = []
+    for token in word_tokens:
+        try:
+            vec = fast_text_model[token]
+            word_matrix.append(vec)
+        except KeyError:
+            pass
+    return word_matrix
+
+
+def flatten_fast_text_matrix(row):
+    m = row.fast_text_matrix[0 : config.FLATTEN_MAX_LENGTH]
+    l = []
+    for u in m:
+        l.extend(u)
+    return l
 
 
 def preprocess(text, stop_words_flag=False):
@@ -125,6 +150,15 @@ if config.USE_CONTEXT:
     df["text_with_context"] = df.apply(get_context_window, axis=1)
 
 df["label"] = df.discourse_effectiveness.apply(discourse_effectiveness_to_int)
+
+print("buildin fast text matrix")
+df["fast_text_matrix"] = df.apply(build_fast_text_matrix, axis=1)
+
+print("buildin flattened fast text matrix")
+df["flatten_text_matrix"] = df.apply(flatten_fast_text_matrix, axis=1)
+
+print("Done with fast text")
+
 
 df.sort_values(by=["essay_id", "text_start"])
 
