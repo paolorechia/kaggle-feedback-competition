@@ -20,7 +20,7 @@ def load_dataset(partition="train", category="Claim"):
         with open(label_fp, "r") as fp:
             y = np.array(json.load(fp))
         with open(data_fp, "r") as fp:
-            X = np.array(json.load(fp), dtype=np.float32)
+            X = np.array(json.load(fp), dtype=np.float16)
         print("Loaded data from cache L2")
     except:
         csv_fp = utils.get_by_category_fp(
@@ -41,7 +41,7 @@ def load_dataset(partition="train", category="Claim"):
     return X, y
 
 
-def create_tensors(X, y):
+def create_tensors(X, y, use_bfloat16=False):
     print("Converting to tensor...")
     print(X.shape)
     X_tensor = torch.from_numpy(X)
@@ -63,6 +63,8 @@ def create_tensors(X, y):
     print("Sending tensors to GPU")
     X_tensor.cuda()
     y_tensor.cuda()
+    if use_bfloat16:
+        return X_tensor.bfloat16(), y_tensor.bfloat16()
     return X_tensor, y_tensor
 
 
@@ -78,13 +80,15 @@ print("Defining network...")
 class Model(nn.Module):
     def __init__(self):
         super(Model, self).__init__()
-        self.linear1 = nn.Linear(38400, 200, dtype=torch.float)
-        self.linear2 = nn.Linear(200, 3)
+        self.linear1 = nn.Linear(38400, 1000, dtype=torch.bfloat16)
+        self.linear2 = nn.Linear(1000, 200, dtype=torch.bfloat16)
+        self.linear3 = nn.Linear(200, 3, dtype=torch.bfloat16)
 
     def forward(self, x):
-        h = torch.relu(self.linear1(x))
-        o = torch.relu(self.linear2(h))
-        return o
+        a = torch.relu(self.linear1(x))
+        b = torch.relu(self.linear2(a))
+        c = torch.relu(self.linear3(b))
+        return c
 
 
 print("Using torch device", device)
@@ -100,7 +104,7 @@ feature_column = "flatten_text_matrix"
 
 
 X_train, y_train = load_dataset(partition="train")
-X_train_tensor, y_train_tensor = create_tensors(X_train, y_train)
+X_train_tensor, y_train_tensor = create_tensors(X_train, y_train, use_bfloat16=True)
 
 print("Training...")
 ## y in math
@@ -129,7 +133,7 @@ del y_train_tensor
 def test_model_on(partition):
     print("Testing on partition... ", partition)
     X, y = load_dataset(partition)
-    X_tensor, y_tensor = create_tensors(X, y)
+    X_tensor, y_tensor = create_tensors(X, y, use_bfloat16=True)
 
     hits = 0.0
     misses = 0.0
