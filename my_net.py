@@ -85,6 +85,7 @@ class Model(nn.Module):
         self.linear3 = nn.Linear(200, 3, dtype=torch.bfloat16)
 
     def forward(self, x):
+
         a = torch.relu(self.linear1(x))
         b = torch.relu(self.linear2(a))
         c = torch.relu(self.linear3(b))
@@ -95,9 +96,8 @@ print("Using torch device", device)
 print("Moving model to device...")
 model = Model()
 model.to(device)
-criterion = torch.nn.MSELoss()
 optimizer = torch.optim.SGD(model.parameters(), lr=0.1)
-
+criterion = nn.CrossEntropyLoss()
 print("Loading data...")
 category = "Claim"
 feature_column = "flatten_text_matrix"
@@ -110,7 +110,7 @@ print("Training...")
 ## y in math
 total_loss = 0.0
 j = 0
-for epoch in range(10):
+for epoch in range(30):
     for idx in range(len(X_train_tensor)):
         X = X_train_tensor[idx].to(device)
         y = y_train_tensor[idx].to(device)
