@@ -127,9 +127,9 @@ class RNN(nn.Module):
         return hidden
 
 
-class Model(nn.Module):
+class MLP(nn.Module):
     def __init__(self):
-        super(Model, self).__init__()
+        super(MLP, self).__init__()
         self.linear1 = nn.Linear(INPUT_SIZE, 1000, dtype=torch.bfloat16)
         self.linear2 = nn.Linear(1000, 200, dtype=torch.bfloat16)
         self.linear3 = nn.Linear(200, 3, dtype=torch.bfloat16)
@@ -143,23 +143,25 @@ class Model(nn.Module):
 
 print("Using torch device", device)
 print("Moving model to device...")
-# model = Model()
-model = RNN(
-    input_size=config.FAST_TEXT_EMBEDDING_SIZE,
-    n_layers=3,
-    output_size=3,
-    hidden_size=100,
-)
+model = MLP()
+# model = RNN(
+#     input_size=config.FAST_TEXT_EMBEDDING_SIZE,
+#     n_layers=3,
+#     output_size=3,
+#     hidden_size=100,
+# )
 model.to(device)
 optimizer = torch.optim.SGD(model.parameters(), lr=0.1)
 criterion = nn.CrossEntropyLoss()
 print("Loading data...")
 category = "Claim"
 feature_column = "flatten_text_matrix"
-
+as_matrix = type(model) != MLP
 
 X_train, y_train = load_dataset(partition="train")
-X_train_tensor, y_train_tensor = create_tensors(X_train, y_train, use_bfloat16=True)
+X_train_tensor, y_train_tensor = create_tensors(
+    X_train, y_train, use_bfloat16=True, as_matrix=as_matrix
+)
 
 print("Training...")
 ## y in math
@@ -185,10 +187,10 @@ del X_train_tensor
 del y_train_tensor
 
 
-def test_model_on(partition):
+def test_model_on(partition, as_matrix):
     print("Testing on partition... ", partition)
     X, y = load_dataset(partition)
-    X_tensor, y_tensor = create_tensors(X, y, use_bfloat16=True)
+    X_tensor, y_tensor = create_tensors(X, y, use_bfloat16=True, as_matrix=as_matrix)
 
     hits = 0.0
     misses = 0.0
@@ -218,6 +220,6 @@ def test_model_on(partition):
     del y_tensor
 
 
-test_model_on("train")
-test_model_on("test")
-test_model_on("val")
+test_model_on("train", as_matrix=as_matrix)
+test_model_on("test", as_matrix=as_matrix)
+test_model_on("val", as_matrix=as_matrix)
