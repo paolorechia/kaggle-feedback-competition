@@ -98,6 +98,8 @@ class RNN(nn.Module):
 
     def forward(self, x):
         # Initializing hidden state for first input using method defined below
+        hidden = self.init_hidden_unbatched()
+
         first = x[0]
         out, hidden = self.rnn(
             first.reshape(1, config.FAST_TEXT_EMBEDDING_SIZE), hidden
