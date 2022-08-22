@@ -41,9 +41,13 @@ def load_dataset(partition="train", category="Claim"):
     return X, y
 
 
-def create_tensors(X, y, use_bfloat16=False):
+def create_tensors(X, y, use_bfloat16=False, as_matrix=True):
     print("Converting to tensor...")
     print(X.shape)
+    if as_matrix:
+        X = X.reshape(
+            len(X), config.FLATTEN_MAX_LENGTH, config.FAST_TEXT_EMBEDDING_SIZE
+        )
     X_tensor = torch.from_numpy(X)
     print(X_tensor.shape)
     print(X_tensor[0].shape)
@@ -76,16 +80,54 @@ device = torch.device(device)
 
 print("Defining network...")
 
+INPUT_SIZE = 38400
+
+
+class RNN(nn.Module):
+    def __init__(
+        self, input_size, hidden_size=300, n_layers=1, output_size=3, device="cuda"
+    ):
+        super(RNN, self).__init__()
+        self.hidden_dim = hidden_size
+        self.n_layers = n_layers
+        self.device = device
+        self.output_size = 3
+
+        self.rnn = nn.RNN(input_size, hidden_size, n_layers, dtype=torch.bfloat16)
+        self.linear = nn.Linear(hidden_size, output_size, dtype=torch.bfloat16)
+
+    def forward(self, x):
+        # Initializing hidden state for first input using method defined below
+        first = x[0]
+        out, hidden = self.rnn(
+            first.reshape(1, config.FAST_TEXT_EMBEDDING_SIZE), hidden
+        )
+
+        for token in x[1:]:
+            reshaped = token.reshape(1, config.FAST_TEXT_EMBEDDING_SIZE)
+            out, hidden = self.rnn(reshaped, hidden)
+        out = out.contiguous().view(-1, self.hidden_dim)
+        out = self.linear(out)
+
+        return out.reshape(self.output_size)
+
+    def init_hidden_unbatched(self):
+        # This method generates the first hidden state of zeros which we'll use in the forward pass
+        # We'll send the tensor holding the hidden state to the device we specified earlier as well
+        hidden = torch.zeros(
+            self.n_layers, self.hidden_dim, device=self.device, dtype=torch.bfloat16
+        )
+        return hidden
+
 
 class Model(nn.Module):
     def __init__(self):
         super(Model, self).__init__()
-        self.linear1 = nn.Linear(38400, 1000, dtype=torch.bfloat16)
+        self.linear1 = nn.Linear(INPUT_SIZE, 1000, dtype=torch.bfloat16)
         self.linear2 = nn.Linear(1000, 200, dtype=torch.bfloat16)
         self.linear3 = nn.Linear(200, 3, dtype=torch.bfloat16)
 
     def forward(self, x):
-
         a = torch.relu(self.linear1(x))
         b = torch.relu(self.linear2(a))
         c = torch.relu(self.linear3(b))
@@ -94,7 +136,8 @@ class Model(nn.Module):
 
 print("Using torch device", device)
 print("Moving model to device...")
-model = Model()
+# model = Model()
+model = RNN(input_size=config.FAST_TEXT_EMBEDDING_SIZE, output_size=3)
 model.to(device)
 optimizer = torch.optim.SGD(model.parameters(), lr=0.1)
 criterion = nn.CrossEntropyLoss()
@@ -110,12 +153,14 @@ print("Training...")
 ## y in math
 total_loss = 0.0
 j = 0
-for epoch in range(30):
+for epoch in range(3):
     for idx in range(len(X_train_tensor)):
         X = X_train_tensor[idx].to(device)
         y = y_train_tensor[idx].to(device)
         optimizer.zero_grad()
+        # Pass through each token through the model
         result = model(X)
+        # print("Result", result)
         loss = criterion(result, y)
         loss.backward()
         total_loss += loss.item()
