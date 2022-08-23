@@ -130,24 +130,26 @@ class RNN(nn.Module):
 class MLP(nn.Module):
     def __init__(self):
         super(MLP, self).__init__()
+        self.dropout_prob = 0.2
         self.linear1 = nn.Linear(INPUT_SIZE, 200, dtype=torch.bfloat16)
         self.linear4 = nn.Linear(200, 3, dtype=torch.bfloat16)
 
     def forward(self, x):
         a = torch.relu(self.linear1(x))
-        d = torch.relu(self.linear4(a))
-        return d
+        b = torch.dropout(a, self.dropout_prob, train=True)
+        c = torch.relu(self.linear4(a))
+        return c
 
 
 print("Using torch device", device)
 print("Moving model to device...")
-model = MLP()
-# model = RNN(
-#     input_size=config.FAST_TEXT_EMBEDDING_SIZE,
-#     n_layers=3,
-#     output_size=3,
-#     hidden_size=100,
-# )
+# model = MLP()
+model = RNN(
+    input_size=config.FAST_TEXT_EMBEDDING_SIZE,
+    n_layers=3,
+    output_size=3,
+    hidden_size=100,
+)
 model.to(device)
 optimizer = torch.optim.SGD(model.parameters(), lr=0.1)
 criterion = nn.CrossEntropyLoss()
@@ -173,9 +175,9 @@ print("Training...")
 ## y in math
 total_loss = 0.0
 j = 0
-n_epochs = 20
+n_epochs = 100
 evaluate_on_epoch_end = True
-early_stop = True
+early_stop = False
 should_stop = False
 previous_test_loss = 100.00
 for epoch in range(n_epochs):

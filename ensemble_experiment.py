@@ -49,7 +49,7 @@ Evidence
 
 MAX_ITERS = 1000
 
-using_category = "Position"
+using_category = "Claim"
 for category in utils.categories:
     if category != using_category:
         continue
