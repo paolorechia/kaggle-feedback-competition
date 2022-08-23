@@ -130,15 +130,13 @@ class RNN(nn.Module):
 class MLP(nn.Module):
     def __init__(self):
         super(MLP, self).__init__()
-        self.linear1 = nn.Linear(INPUT_SIZE, 1000, dtype=torch.bfloat16)
-        self.linear2 = nn.Linear(1000, 200, dtype=torch.bfloat16)
-        self.linear3 = nn.Linear(200, 3, dtype=torch.bfloat16)
+        self.linear1 = nn.Linear(INPUT_SIZE, 200, dtype=torch.bfloat16)
+        self.linear4 = nn.Linear(200, 3, dtype=torch.bfloat16)
 
     def forward(self, x):
         a = torch.relu(self.linear1(x))
-        b = torch.relu(self.linear2(a))
-        c = torch.relu(self.linear3(b))
-        return c
+        d = torch.relu(self.linear4(a))
+        return d
 
 
 print("Using torch device", device)
@@ -162,12 +160,29 @@ X_train, y_train = load_dataset(partition="train")
 X_train_tensor, y_train_tensor = create_tensors(
     X_train, y_train, use_bfloat16=True, as_matrix=as_matrix
 )
+X_test, y_test = load_dataset(partition="test")
+X_test_tensor, y_test_tensor = create_tensors(
+    X_test, y_test, use_bfloat16=True, as_matrix=as_matrix
+)
 
+X_val, y_val = load_dataset(partition="val")
+X_val_tensor, y_val_tensor = create_tensors(
+    X_val, y_val, use_bfloat16=True, as_matrix=as_matrix
+)
 print("Training...")
 ## y in math
 total_loss = 0.0
 j = 0
-for epoch in range(3):
+n_epochs = 20
+evaluate_on_epoch_end = True
+early_stop = True
+should_stop = False
+previous_test_loss = 100.00
+for epoch in range(n_epochs):
+    if should_stop:
+        print("Stopping early...")
+        break
+    model.train()
     for idx in range(len(X_train_tensor)):
         X = X_train_tensor[idx].to(device)
         y = y_train_tensor[idx].to(device)
@@ -178,7 +193,33 @@ for epoch in range(3):
         total_loss += loss.item()
         optimizer.step()
         j += 1
-    print("epoch {}, loss {}".format(epoch, total_loss / j))
+    print("epoch {}, running loss {}".format(epoch, total_loss / j))
+    if evaluate_on_epoch_end:
+        model.eval()
+        with torch.no_grad():
+            for partition, X_data, y_data in [
+                ("train", X_train_tensor, y_train_tensor),
+                ("test", X_test_tensor, y_test_tensor),
+                ("val", X_val_tensor, y_val_tensor),
+            ]:
+                test_total_loss = 0.0
+                test_j = 0
+                for idx in range(len(X_data)):
+                    X = X_data[idx].to(device)
+                    y = y_data[idx].to(device)
+                    result = model(X)
+                    loss = criterion(result, y)
+                    test_total_loss += loss.item()
+                    test_j += 1
+                average_loss = test_total_loss / test_j
+                print(f"epoch {epoch}, {partition} loss {average_loss}")
+
+                if partition == "test":
+                    test_loss_diff = previous_test_loss - average_loss
+                    print(f"test loss diff: {test_loss_diff}")
+                    if early_stop and test_loss_diff < -0.01:
+                        should_stop = True
+                    previous_test_loss = average_loss
 
 print("Cleaning training data...")
 del X_train
@@ -196,6 +237,7 @@ def test_model_on(partition, as_matrix):
     misses = 0.0
     total_loss = 0.0
     j = 0
+    model.eval()
     for idx in range(len(X_tensor)):
         X = X_tensor[idx].to(device)
         y = y_tensor[idx].to(device)
