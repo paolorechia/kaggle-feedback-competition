@@ -141,15 +141,29 @@ class MLP(nn.Module):
         return c
 
 
+class Conv(nn.Module):
+    def __init__(self):
+        super(Conv, self).__init__()
+        self.linear1 = nn.Conv2d(8, 200, dtype=torch.bfloat16)
+        self.linear4 = nn.Linear(200, 3, dtype=torch.bfloat16)
+
+    def forward(self, x):
+        a = torch.relu(self.linear1(x))
+        b = torch.dropout(a, self.dropout_prob, train=True)
+        c = torch.relu(self.linear4(a))
+        return c
+
+
 print("Using torch device", device)
 print("Moving model to device...")
 # model = MLP()
-model = RNN(
-    input_size=config.FAST_TEXT_EMBEDDING_SIZE,
-    n_layers=3,
-    output_size=3,
-    hidden_size=100,
-)
+# model = RNN(
+#     input_size=config.FAST_TEXT_EMBEDDING_SIZE,
+#     n_layers=3,
+#     output_size=3,
+#     hidden_size=100,
+# )
+model = Conv()
 model.to(device)
 optimizer = torch.optim.SGD(model.parameters(), lr=0.1)
 criterion = nn.CrossEntropyLoss()
